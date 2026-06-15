@@ -423,11 +423,14 @@ export default function Wheel({ navigate }) {
             <label className="wheel-input-label">Fiş Numarası (Zorunlu)</label>
             <input
               type="text"
-              placeholder="Örn: TR-12345"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              placeholder="Örn: 0161"
               value={receiptNo}
               onChange={(e) => {
-                setReceiptNo(e.target.value);
-                if (e.target.value.trim()) setError('');
+                const val = e.target.value.replace(/[^0-9]/g, '');
+                setReceiptNo(val);
+                if (val.trim()) setError('');
               }}
               style={{
                 borderColor: !receiptNo.trim() && error ? 'var(--kirmizi)' : 'rgba(255, 255, 255, 0.15)',
