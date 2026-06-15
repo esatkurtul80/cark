@@ -1,3 +1,5 @@
+'use client';
+
 import { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase';
 import { collection, getDocs, addDoc, query, orderBy, writeBatch, doc } from 'firebase/firestore';
@@ -18,7 +20,6 @@ export default function Wheel({ navigate }) {
   const animationFrameIdRef = useRef(null);
   const confettiParticlesRef = useRef([]);
 
-  // Default Tuğba Kuruyemiş products for auto-seeding
   const defaultProducts = [
     { name: 'Antep Fıstığı', chance: 100, color: '#2A6B40', text_color: '#FBF3E4', is_active: true },
     { name: 'Gül Lokumu', chance: 20, color: '#D9A441', text_color: '#123A20', is_active: true },
@@ -43,7 +44,6 @@ export default function Wheel({ navigate }) {
   ];
 
   useEffect(() => {
-    // Check if store session exists
     const sessionStr = localStorage.getItem('store_session');
     if (!sessionStr) {
       navigate('/login');
@@ -51,7 +51,6 @@ export default function Wheel({ navigate }) {
     }
     setStore(JSON.parse(sessionStr));
 
-    // Fetch active products or auto-seed them if none exist
     async function loadProducts() {
       try {
         const productsRef = collection(db, 'products');
@@ -68,13 +67,12 @@ export default function Wheel({ navigate }) {
             const newDocRef = doc(collection(db, 'products'));
             batch.set(newDocRef, {
               ...item,
-              created_at: new Date(Date.now() + idx * 1000).toISOString() // distinct creation times for ordering
+              created_at: new Date(Date.now() + idx * 1000).toISOString()
             });
           });
 
           await batch.commit();
 
-          // Refetch after seeding
           const refetchedSnapshot = await getDocs(q);
           list = refetchedSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         }
@@ -102,7 +100,6 @@ export default function Wheel({ navigate }) {
     navigate('/login');
   };
 
-  // Client-side lottery calculation (backed securely by weights)
   const calculateWinnerIndex = () => {
     const DILIM = products.length;
     const weights = products.map((p) => (p.chance > 0 ? 1 / p.chance : 0));
@@ -132,7 +129,6 @@ export default function Wheel({ navigate }) {
       const winProduct = products[winnerIndex];
       setWinner(winProduct);
 
-      // Save spin log in Firestore
       await addDoc(collection(db, 'spins'), {
         store_id: store.id,
         store_name: store.name,
@@ -141,7 +137,6 @@ export default function Wheel({ navigate }) {
         created_at: new Date().toISOString()
       });
 
-      // Spin rotation calculations
       const DILIM = products.length;
       const ACI = 360 / DILIM;
       
@@ -323,66 +318,70 @@ export default function Wheel({ navigate }) {
         </button>
       </div>
 
-      <header style={styles.header}>
-        <div className="marka">Tuğba Kuruyemiş</div>
-        <h1 style={styles.title}>Hediye Çarkı</h1>
-        <div className="kosul" style={styles.kosul}>
-          500 TL ve üzeri alışverişe özel · 1 çevirme hakkı
-        </div>
-      </header>
-
       {error && <div style={styles.errorBox}>{error}</div>}
 
-      {/* Inputs area */}
-      <div style={styles.inputArea}>
-        <label style={styles.inputLabel}>Fiş Numarası (Opsiyonel)</label>
-        <input
-          type="text"
-          placeholder="Örn: TR-12345"
-          value={receiptNo}
-          onChange={(e) => setReceiptNo(e.target.value)}
-          className="glass-input"
-          style={styles.receiptInput}
-          disabled={spinning}
-        />
-      </div>
-
-      {/* Wheel Area */}
-      <div style={styles.carkAlani}>
-        <div style={styles.ibre}></div>
-        <div
-          id="carkSarici"
-          ref={wheelRef}
-          style={{
-            ...styles.carkSarici,
-            transition: spinning ? 'transform 5.2s cubic-bezier(0.12, 0.65, 0.06, 1)' : 'none'
-          }}
-        >
-          {products.length > 0 ? (
-            renderWheelSegments()
-          ) : (
-            <div style={styles.noProducts}>
-              Çarkta aktif ürün bulunamadı.
+      <div className="wheel-split-layout">
+        {/* LEFT COLUMN: THE GIANT WHEEL */}
+        <div className="wheel-left-side">
+          <div className="wheel-container-large">
+            <div style={styles.ibre}></div>
+            <div
+              id="carkSarici"
+              ref={wheelRef}
+              style={{
+                ...styles.carkSarici,
+                transition: spinning ? 'transform 5.2s cubic-bezier(0.12, 0.65, 0.06, 1)' : 'none'
+              }}
+            >
+              {products.length > 0 ? (
+                renderWheelSegments()
+              ) : (
+                <div style={styles.noProducts}>
+                  Çarkta aktif ürün bulunamadı.
+                </div>
+              )}
             </div>
-          )}
+            <div className="gobek" style={styles.gobek} onClick={handleSpin}>
+              ÇEVİR!
+            </div>
+          </div>
         </div>
-        <div className="gobek" style={styles.gobek} onClick={handleSpin}>
-          ÇEVİR!
+
+        {/* RIGHT COLUMN: TEXTS AND CONTROLS */}
+        <div className="wheel-right-side">
+          <div className="wheel-branding">
+            <div className="wheel-marka">Tuğba Kuruyemiş</div>
+            <h1 className="wheel-title">Hediye Çarkı</h1>
+            <div className="wheel-kosul">
+              500 TL ve üzeri alışverişe özel · 1 çevirme hakkı
+            </div>
+          </div>
+
+          <div className="wheel-input-area">
+            <label className="wheel-input-label">Fiş Numarası (Opsiyonel)</label>
+            <input
+              type="text"
+              placeholder="Örn: TR-12345"
+              value={receiptNo}
+              onChange={(e) => setReceiptNo(e.target.value)}
+              className="glass-input wheel-receipt-input"
+              disabled={spinning}
+            />
+          </div>
+
+          <button
+            className="btn-primary wheel-spin-btn"
+            onClick={handleSpin}
+            disabled={spinning || products.length === 0}
+          >
+            {spinning ? 'ÇARK DÖNÜYOR...' : 'ÇARKI ÇEVİR'}
+          </button>
+
+          <p className="wheel-alt-not">
+            Çarkta çıkan üründen <strong>250 g'lık 1 paket</strong> hediye kazanırsınız.
+          </p>
         </div>
       </div>
-
-      <button
-        className="btn-primary"
-        style={styles.cevirBtn}
-        onClick={handleSpin}
-        disabled={spinning || products.length === 0}
-      >
-        {spinning ? 'ÇARK DÖNÜYOR...' : 'ÇARKI ÇEVİR'}
-      </button>
-
-      <p className="alt-not">
-        Çarkta çıkan üründen <strong>250 g'lık 1 paket</strong> hediye kazanırsınız.
-      </p>
 
       {/* Results Modal */}
       {showModal && winner && (
@@ -413,14 +412,14 @@ export default function Wheel({ navigate }) {
   );
 }
 
-// Reuse the Next.js CSS layout styles translated to inline JS objects for Vite compatibility
 const styles = {
   container: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
+    justifyContent: 'center',
     minHeight: '100vh',
-    padding: '70px 20px 20px 20px',
+    padding: '80px 20px 40px 20px',
     position: 'relative',
   },
   loadingScreen: {
@@ -471,19 +470,6 @@ const styles = {
     fontWeight: '600',
     transition: 'opacity 0.2s',
   },
-  header: {
-    textAlign: 'center',
-    padding: '10px 16px 8px',
-  },
-  title: {
-    fontSize: 'clamp(28px, 6vw, 44px)',
-    fontWeight: '900',
-    marginTop: '4px',
-    textShadow: '0 3px 0 rgba(0,0,0,.25)',
-  },
-  kosul: {
-    marginTop: '10px',
-  },
   errorBox: {
     background: 'rgba(179, 64, 47, 0.2)',
     border: '1px solid var(--kirmizi)',
@@ -496,34 +482,6 @@ const styles = {
     textAlign: 'center',
     maxWidth: '460px',
     width: '100%',
-  },
-  inputArea: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    marginTop: '16px',
-    width: '100%',
-    maxWidth: '280px',
-    gap: '6px',
-  },
-  inputLabel: {
-    fontSize: '12px',
-    fontWeight: '700',
-    opacity: 0.9,
-    letterSpacing: '0.5px',
-  },
-  receiptInput: {
-    width: '100%',
-    textAlign: 'center',
-    fontWeight: '700',
-    fontSize: '16px',
-    letterSpacing: '1px',
-  },
-  carkAlani: {
-    position: 'relative',
-    width: 'min(86vw, 450px)',
-    height: 'min(86vw, 450px)',
-    margin: '20px 0 10px',
   },
   ibre: {
     position: 'absolute',
@@ -570,12 +528,6 @@ const styles = {
     userSelect: 'none',
     boxShadow: '0 4px 12px rgba(0,0,0,.4)',
     transition: 'transform 0.1s',
-  },
-  cevirBtn: {
-    margin: '12px 0 6px',
-    fontSize: 'clamp(18px, 4.5vw, 22px)',
-    letterSpacing: '2px',
-    padding: '14px 48px',
   },
   noProducts: {
     display: 'flex',

@@ -150,6 +150,157 @@ h1, h2, h3, h4, h5, h6 {
   transform: scale(1.1) rotate(5deg);
 }
 
+/* Split Layout for Store Wheel Page */
+.wheel-split-layout {
+  display: flex;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  gap: 60px;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.wheel-left-side {
+  flex: 1.2;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.wheel-right-side {
+  flex: 0.8;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 24px;
+  padding: 20px;
+}
+
+.wheel-container-large {
+  position: relative;
+  width: min(85vw, 80vh, 580px);
+  height: min(85vw, 80vh, 580px);
+}
+
+@media (max-width: 850px) {
+  .wheel-split-layout {
+    flex-direction: column;
+    gap: 30px;
+    padding: 10px;
+  }
+  
+  .wheel-right-side {
+    align-items: center;
+    text-align: center;
+    padding: 10px;
+    gap: 16px;
+  }
+
+  .wheel-container-large {
+    width: min(85vw, 420px);
+    height: min(85vw, 420px);
+  }
+}
+
+/* Split Layout Components */
+.wheel-branding {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.wheel-marka {
+  font-size: 14px;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: var(--altin);
+  font-weight: 700;
+}
+
+.wheel-title {
+  font-size: clamp(32px, 5vw, 52px);
+  font-weight: 900;
+  line-height: 1.1;
+  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.25);
+  margin-top: 4px;
+}
+
+.wheel-kosul {
+  display: inline-block;
+  background: var(--altin);
+  color: var(--koyu-yesil);
+  font-weight: 800;
+  font-size: 14px;
+  padding: 8px 20px;
+  border-radius: 999px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  align-self: flex-start;
+}
+
+.wheel-input-area {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 320px;
+  gap: 8px;
+}
+
+.wheel-input-label {
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0.9;
+  letter-spacing: 0.5px;
+}
+
+.wheel-receipt-input {
+  width: 100%;
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: 1px;
+}
+
+.wheel-spin-btn {
+  font-size: 20px;
+  letter-spacing: 2px;
+  padding: 16px 48px;
+  width: 100%;
+  max-width: 320px;
+  margin: 10px 0;
+}
+
+.wheel-alt-not {
+  font-size: 13px;
+  opacity: 0.85;
+  line-height: 1.5;
+  max-width: 320px;
+}
+
+/* On mobile, center everything in the right column */
+@media (max-width: 850px) {
+  .wheel-branding {
+    align-items: center;
+  }
+  .wheel-title {
+    text-align: center;
+  }
+  .wheel-kosul {
+    align-self: center;
+  }
+  .wheel-input-label {
+    text-align: center;
+  }
+  .wheel-receipt-input {
+    text-align: center;
+  }
+  .wheel-alt-not {
+    text-align: center;
+  }
+}
+
 /* Animations */
 @keyframes popIn {
   from { transform: scale(0.85); opacity: 0; }
