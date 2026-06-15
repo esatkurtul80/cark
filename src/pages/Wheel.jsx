@@ -146,6 +146,7 @@ export default function Wheel({ navigate }) {
     if (spinning || products.length === 0) return;
     
     if (!receiptNo.trim()) {
+      alert('Lütfen fiş numarasını giriniz.');
       setError('Lütfen fiş numarasını giriniz.');
       return;
     }
@@ -401,7 +402,7 @@ export default function Wheel({ navigate }) {
                 opacity: !receiptNo.trim() ? 0.6 : 1,
                 cursor: !receiptNo.trim() ? 'not-allowed' : 'pointer'
               }}
-              onClick={handleSpin}
+              onClick={!receiptNo.trim() || spinning ? null : handleSpin}
             >
               ÇEVİR!
             </div>
@@ -424,11 +425,23 @@ export default function Wheel({ navigate }) {
               type="text"
               placeholder="Örn: TR-12345"
               value={receiptNo}
-              onChange={(e) => setReceiptNo(e.target.value)}
+              onChange={(e) => {
+                setReceiptNo(e.target.value);
+                if (e.target.value.trim()) setError('');
+              }}
+              style={{
+                borderColor: !receiptNo.trim() && error ? 'var(--kirmizi)' : 'rgba(255, 255, 255, 0.15)',
+                boxShadow: !receiptNo.trim() && error ? '0 0 10px rgba(179, 64, 47, 0.5)' : 'none'
+              }}
               className="glass-input wheel-receipt-input"
               disabled={spinning}
               required
             />
+            {!receiptNo.trim() && error && (
+              <span style={{ color: 'var(--pembe)', fontSize: '12.5px', fontWeight: 'bold', marginTop: '4px', display: 'block' }}>
+                * Fiş numarası girmek zorunludur!
+              </span>
+            )}
           </div>
 
           <button
