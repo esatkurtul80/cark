@@ -51,27 +51,44 @@ export const playClick = () => {
   }
 };
 
-// Mechanical tick sound for wheel rotation (increased volume and duration for clarity)
+// Mechanical tick sound for wheel rotation (realistic dual-frequency wooden peg click, slightly quieter)
 export const playTick = () => {
   initAudio();
   if (!audioCtx) return;
   try {
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
+    const now = audioCtx.currentTime;
     
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
+    // 1. High-pitched crisp transient (the plastic flapper click)
+    const oscClick = audioCtx.createOscillator();
+    const gainClick = audioCtx.createGain();
+    oscClick.connect(gainClick);
+    gainClick.connect(audioCtx.destination);
     
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(180, audioCtx.currentTime);
-    osc.frequency.setValueAtTime(750, audioCtx.currentTime + 0.003);
-    osc.frequency.exponentialRampToValueAtTime(120, audioCtx.currentTime + 0.04);
+    oscClick.type = 'triangle';
+    oscClick.frequency.setValueAtTime(2200, now);
+    oscClick.frequency.exponentialRampToValueAtTime(700, now + 0.006);
     
-    gain.gain.setValueAtTime(0.9, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.04);
+    gainClick.gain.setValueAtTime(0.15, now);
+    gainClick.gain.exponentialRampToValueAtTime(0.001, now + 0.006);
     
-    osc.start();
-    osc.stop(audioCtx.currentTime + 0.04);
+    oscClick.start(now);
+    oscClick.stop(now + 0.006);
+    
+    // 2. Mid-low frequency resonance (the wooden/hollow wheel body sound)
+    const oscBody = audioCtx.createOscillator();
+    const gainBody = audioCtx.createGain();
+    oscBody.connect(gainBody);
+    gainBody.connect(audioCtx.destination);
+    
+    oscBody.type = 'sine';
+    oscBody.frequency.setValueAtTime(280, now);
+    oscBody.frequency.exponentialRampToValueAtTime(120, now + 0.02);
+    
+    gainBody.gain.setValueAtTime(0.25, now);
+    gainBody.gain.exponentialRampToValueAtTime(0.001, now + 0.02);
+    
+    oscBody.start(now);
+    oscBody.stop(now + 0.02);
   } catch (e) {
     console.warn('Audio play failed:', e);
   }
