@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, doc, getDoc, setDoc } from 'firebase/firestore';
+import { playClick } from '../utils/audio';
 
 export default function Login({ navigate, defaultView = 'select' }) {
   const [view, setView] = useState(defaultView); // 'select' | 'store' | 'admin'
@@ -18,6 +19,7 @@ export default function Login({ navigate, defaultView = 'select' }) {
   // Store login form submit handler
   const handleStoreSubmit = async (e) => {
     e.preventDefault();
+    playClick();
     setError('');
     setLoading(true);
 
@@ -57,6 +59,7 @@ export default function Login({ navigate, defaultView = 'select' }) {
   // Admin login form submit handler
   const handleAdminSubmit = async (e) => {
     e.preventDefault();
+    playClick();
     setError('');
     setLoading(true);
 
@@ -97,6 +100,7 @@ export default function Login({ navigate, defaultView = 'select' }) {
   };
 
   const handleBack = () => {
+    playClick();
     setView('select');
     setError('');
     setUsername('');
@@ -116,13 +120,13 @@ export default function Login({ navigate, defaultView = 'select' }) {
           <p style={styles.selectSubtitle}>Giriş yapmak istediğiniz paneli seçiniz.</p>
           <div className="select-gateway-grid">
             {/* Store Login Button (Left) */}
-            <div className="glass-card gateway-card" onClick={() => setView('store')}>
+            <div className="glass-card gateway-card" onClick={() => { playClick(); setView('store'); }}>
               <div className="gateway-icon">🏪</div>
               <h2 style={styles.gatewayTitle}>Mağaza Girişi</h2>
               <p style={styles.gatewayDesc}>Şubeler için hediye çarkı çevirme ekranı</p>
             </div>
             {/* Admin Login Button (Right) */}
-            <div className="glass-card gateway-card" onClick={() => setView('admin')}>
+            <div className="glass-card gateway-card" onClick={() => { playClick(); setView('admin'); }}>
               <div className="gateway-icon">⚙️</div>
               <h2 style={styles.gatewayTitle}>Yönetici Girişi</h2>
               <p style={styles.gatewayDesc}>Raporlar, olasılıklar ve ürün tanımlamaları</p>

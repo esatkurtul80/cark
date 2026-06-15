@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
+import Welcome from './pages/Welcome';
 import Wheel from './pages/Wheel';
 import Login from './pages/Login';
 import Admin from './pages/Admin';
+import { playClick } from './utils/audio';
 
 export default function App() {
+  const [hasStarted, setHasStarted] = useState(false);
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
 
   // Synchronize state with history popstate
@@ -18,6 +21,7 @@ export default function App() {
   }, []);
 
   const navigate = (path) => {
+    playClick();
     window.history.pushState({}, '', path);
     setCurrentPath(path);
   };
@@ -61,6 +65,12 @@ export default function App() {
   // Determine what to display based on currentPath and session state
   const storeSession = getStoreSession();
   const adminSession = getAdminSession();
+
+  // If the user hasn't clicked "Dokunun" to start and is on a public route, show welcome page
+  const isAdminRoute = currentPath.startsWith('/admin');
+  if (!hasStarted && !isAdminRoute) {
+    return <Welcome onStart={() => setHasStarted(true)} />;
+  }
 
   if (currentPath === '/admin') {
     if (adminSession) {

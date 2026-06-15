@@ -3,6 +3,22 @@
 import { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase';
 import { collection, getDocs, addDoc, query, orderBy, writeBatch, doc } from 'firebase/firestore';
+import { playClick, playTick, playWin } from '../utils/audio';
+
+const getRotationDegrees = (element) => {
+  if (!element) return 0;
+  const style = window.getComputedStyle(element);
+  const transform = style.getPropertyValue('transform') || style.transform;
+  if (!transform || transform === 'none') return 0;
+  
+  const values = transform.split('(')[1].split(')')[0].split(',');
+  const a = parseFloat(values[0]);
+  const b = parseFloat(values[1]);
+  
+  let angle = Math.atan2(b, a) * (180 / Math.PI);
+  if (angle < 0) angle += 360;
+  return angle;
+};
 
 export default function Wheel({ navigate }) {
   const [store, setStore] = useState(null);
@@ -102,6 +118,7 @@ export default function Wheel({ navigate }) {
   }, [navigate]);
 
   const handleLogout = () => {
+    playClick();
     localStorage.removeItem('store_session');
     navigate('/');
   };
@@ -127,6 +144,7 @@ export default function Wheel({ navigate }) {
 
   const handleSpin = async () => {
     if (spinning || products.length === 0) return;
+    playClick();
     setSpinning(true);
     setError('');
 
@@ -157,10 +175,33 @@ export default function Wheel({ navigate }) {
         wheelRef.current.style.transform = `rotate(${nextRotation}deg)`;
       }
 
+      // Continuous ticking animation loop synced with CSS transform
+      let lastSegment = -1;
+      const segmentWidth = 360 / DILIM;
+      let isSpinningActive = true;
+
+      const tickLoop = () => {
+        if (!isSpinningActive || !wheelRef.current) return;
+        const currentAngle = getRotationDegrees(wheelRef.current);
+        const currentSegment = Math.floor(currentAngle / segmentWidth);
+
+        if (currentSegment !== lastSegment) {
+          playTick();
+          lastSegment = currentSegment;
+        }
+
+        requestAnimationFrame(tickLoop);
+      };
+
+      // Start the frame tick loop
+      requestAnimationFrame(tickLoop);
+
       setTimeout(() => {
+        isSpinningActive = false; // Stop the tick loop
         setSpinning(false);
         setShowModal(true);
         triggerConfetti();
+        playWin(); // Play synthesized winning chime!
         setReceiptNo('');
       }, 5400);
 
@@ -404,7 +445,7 @@ export default function Wheel({ navigate }) {
             </p>
             <button
               style={styles.kapatBtn}
-              onClick={() => setShowModal(false)}
+              onClick={() => { playClick(); setShowModal(false); }}
             >
               Tamam
             </button>

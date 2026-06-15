@@ -12,6 +12,7 @@ import {
   where,
   writeBatch
 } from 'firebase/firestore';
+import { playClick } from '../utils/audio';
 
 export default function Admin({ navigate }) {
   const [activeTab, setActiveTab] = useState('raporlar'); // 'raporlar' | 'urunler' | 'magazalar'
@@ -139,6 +140,7 @@ export default function Admin({ navigate }) {
   };
 
   const handleAdminLogout = () => {
+    playClick();
     localStorage.removeItem('admin_session');
     navigate('/admin/login');
   };
@@ -146,6 +148,7 @@ export default function Admin({ navigate }) {
   // --- STORES CRUD ---
   const handleStoreSubmit = async (e) => {
     e.preventDefault();
+    playClick();
     setSubmitting(true);
     setError('');
     setMessage('');
@@ -194,6 +197,7 @@ export default function Admin({ navigate }) {
   };
 
   const handleStoreDelete = async (id) => {
+    playClick();
     if (!confirm('Bu şubeyi silmek istediğinizden emin misiniz?')) return;
     setError('');
     setMessage('');
@@ -210,6 +214,7 @@ export default function Admin({ navigate }) {
   // --- PRODUCTS CRUD ---
   const handleProductSubmit = async (e) => {
     e.preventDefault();
+    playClick();
     setSubmitting(true);
     setError('');
     setMessage('');
@@ -249,6 +254,7 @@ export default function Admin({ navigate }) {
   };
 
   const handleProductDelete = async (id) => {
+    playClick();
     if (!confirm('Bu ürünü silmek istediğinizden emin misiniz? Çark dilim sayısı azalacaktır.')) return;
     setError('');
     setMessage('');
@@ -264,6 +270,7 @@ export default function Admin({ navigate }) {
 
   // --- RESET HISTORY ---
   const handleResetSpins = async () => {
+    playClick();
     if (!confirm('DİKKAT! Tüm hediye çarkı çevrilme geçmişi (raporlar) kalıcı olarak sıfırlanacaktır. Bu işlem geri alınamaz. Emin misiniz?')) return;
     setError('');
     setMessage('');
@@ -286,6 +293,7 @@ export default function Admin({ navigate }) {
 
   // --- EXPORT TO EXCEL/CSV ---
   const exportToCSV = () => {
+    playClick();
     if (filteredSpins.length === 0) return;
     const headers = ['Şube Kodu/Adı', 'Kazanılan Hediye', 'Fiş No', 'Tarih & Saat'];
     const rows = filteredSpins.map(spin => [
@@ -363,7 +371,7 @@ export default function Admin({ navigate }) {
               color: activeTab === 'raporlar' ? 'var(--altin)' : 'var(--krem)',
               opacity: activeTab === 'raporlar' ? 1 : 0.7
             }}
-            onClick={() => setActiveTab('raporlar')}
+            onClick={() => { playClick(); setActiveTab('raporlar'); }}
           >
             📊 Spin Raporları
           </button>
@@ -375,6 +383,7 @@ export default function Admin({ navigate }) {
               opacity: activeTab === 'urunler' ? 1 : 0.7
             }}
             onClick={() => {
+              playClick();
               setActiveTab('urunler');
               setProductForm({ id: '', name: '', chance: 20, color: '#2A6B40', text_color: '#FBF3E4', is_active: true });
             }}
@@ -389,6 +398,7 @@ export default function Admin({ navigate }) {
               opacity: activeTab === 'magazalar' ? 1 : 0.7
             }}
             onClick={() => {
+              playClick();
               setActiveTab('magazalar');
               setStoreForm({ id: '', name: '', username: '', password: '' });
             }}
@@ -620,7 +630,7 @@ export default function Admin({ navigate }) {
                   {productForm.id && (
                     <button
                       type="button"
-                      onClick={() => setProductForm({ id: '', name: '', chance: 20, color: '#2A6B40', text_color: '#FBF3E4', is_active: true })}
+                      onClick={() => { playClick(); setProductForm({ id: '', name: '', chance: 20, color: '#2A6B40', text_color: '#FBF3E4', is_active: true }); }}
                       style={styles.cancelBtn}
                     >
                       Vazgeç
@@ -669,7 +679,7 @@ export default function Admin({ navigate }) {
                       </div>
                       <div style={{ display: 'flex', gap: '6px' }}>
                         <button
-                          onClick={() => setProductForm(p)}
+                          onClick={() => { playClick(); setProductForm(p); }}
                           style={styles.editBtn}
                         >
                           Düzenle
@@ -749,7 +759,7 @@ export default function Admin({ navigate }) {
                   {storeForm.id && (
                     <button
                       type="button"
-                      onClick={() => setStoreForm({ id: '', name: '', username: '', password: '' })}
+                      onClick={() => { playClick(); setStoreForm({ id: '', name: '', username: '', password: '' }); }}
                       style={styles.cancelBtn}
                     >
                       Vazgeç
@@ -777,7 +787,7 @@ export default function Admin({ navigate }) {
                       </div>
                       <div style={{ display: 'flex', gap: '6px' }}>
                         <button
-                          onClick={() => setStoreForm(s)}
+                          onClick={() => { playClick(); setStoreForm(s); }}
                           style={styles.editBtn}
                         >
                           Düzenle
