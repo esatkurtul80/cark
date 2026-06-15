@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import Wheel from './pages/Wheel';
 import Login from './pages/Login';
-import AdminLogin from './pages/AdminLogin';
 import Admin from './pages/Admin';
 
 export default function App() {
@@ -41,7 +40,7 @@ export default function App() {
       navigate('/');
       return null;
     }
-    return <Login navigate={navigate} />;
+    return <Login navigate={navigate} defaultView="select" />;
   }
 
   if (currentPath === '/admin/login') {
@@ -49,7 +48,7 @@ export default function App() {
       navigate('/admin');
       return null;
     }
-    return <AdminLogin navigate={navigate} />;
+    return <Login navigate={navigate} defaultView="admin" />;
   }
 
   if (currentPath === '/admin') {
