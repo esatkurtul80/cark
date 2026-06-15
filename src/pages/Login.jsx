@@ -1,15 +1,12 @@
-'use client';
-
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
+import { db } from '../firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
-export default function StoreLogin() {
+export default function Login({ navigate }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -17,20 +14,33 @@ export default function StoreLogin() {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-      });
+      // Query stores collection in Firestore
+      const q = query(
+        collection(db, 'stores'),
+        where('username', '==', username.trim().toLowerCase()),
+        where('password', '==', password)
+      );
 
-      const data = await res.json();
+      const querySnapshot = await getDocs(q);
 
-      if (!res.ok) {
-        throw new Error(data.error || 'Giriş yapılamadı.');
+      if (querySnapshot.empty) {
+        throw new Error('Geçersiz kullanıcı kodu veya şifre.');
       }
 
-      router.push('/');
-      router.refresh();
+      const storeDoc = querySnapshot.docs[0];
+      const storeData = storeDoc.data();
+
+      // Store session in localStorage
+      localStorage.setItem(
+        'store_session',
+        JSON.stringify({
+          id: storeDoc.id,
+          username: storeData.username,
+          name: storeData.name,
+        })
+      );
+
+      navigate('/');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -88,9 +98,9 @@ export default function StoreLogin() {
       </div>
 
       <div style={styles.footer}>
-        <Link href="/admin/login" style={styles.adminLink}>
+        <button onClick={() => navigate('/admin/login')} style={styles.adminLink}>
           ⚙️ Yönetici Girişi
-        </Link>
+        </button>
       </div>
     </div>
   );
@@ -178,9 +188,11 @@ const styles = {
     marginTop: '24px',
   },
   adminLink: {
+    background: 'none',
+    border: 'none',
     color: 'var(--krem)',
     opacity: 0.6,
-    textDecoration: 'none',
+    cursor: 'pointer',
     fontSize: '14px',
     fontWeight: '600',
   },

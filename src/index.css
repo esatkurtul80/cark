@@ -10,7 +10,7 @@
   --findik: #8A5A2B;
   --kirmizi: #B3402F;
   --beyaz: #FFFFFF;
-  --gri-border: #E5E7EB;
+  --gri-border: rgba(255, 255, 255, 0.15);
   --text-dark: #1E293B;
   --text-light: #F8FAFC;
   --yesil-isik: #22c55e;
@@ -89,6 +89,9 @@ h1, h2, h3, h4, h5, h6 {
   cursor: pointer;
   box-shadow: 0 4px 0 #8a6320, 0 8px 20px rgba(0,0,0,0.3);
   transition: transform 0.1s, box-shadow 0.1s;
+  display: inline-block;
+  text-align: center;
+  text-decoration: none;
 }
 .btn-primary:active {
   transform: translateY(3px);
@@ -105,6 +108,11 @@ h1, h2, h3, h4, h5, h6 {
 @keyframes popIn {
   from { transform: scale(0.85); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 @keyframes float {

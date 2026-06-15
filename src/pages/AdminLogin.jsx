@@ -1,15 +1,12 @@
-'use client';
-
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
+import { db } from '../firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
-export default function AdminLogin() {
+export default function AdminLogin({ navigate }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -17,20 +14,34 @@ export default function AdminLogin() {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/auth/admin-login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-      });
+      const adminDocRef = doc(db, 'settings', 'admin');
+      const adminDoc = await getDoc(adminDocRef);
 
-      const data = await res.json();
+      let expectedUsername = 'admin';
+      let expectedPassword = 'tugba123admin';
 
-      if (!res.ok) {
-        throw new Error(data.error || 'Giriş yapılamadı.');
+      if (adminDoc.exists()) {
+        const adminData = adminDoc.data();
+        expectedUsername = adminData.username;
+        expectedPassword = adminData.password;
+      } else {
+        // Auto-seed admin credentials if they don't exist yet in the database
+        await setDoc(adminDocRef, {
+          username: expectedUsername,
+          password: expectedPassword,
+          created_at: new Date().toISOString(),
+        });
       }
 
-      router.push('/admin');
-      router.refresh();
+      if (
+        username.trim() === expectedUsername &&
+        password === expectedPassword
+      ) {
+        localStorage.setItem('admin_session', 'true');
+        navigate('/admin');
+      } else {
+        throw new Error('Geçersiz yönetici adı veya şifre.');
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -88,9 +99,9 @@ export default function AdminLogin() {
       </div>
 
       <div style={styles.footer}>
-        <Link href="/login" style={styles.storeLink}>
+        <button onClick={() => navigate('/login')} style={styles.storeLink}>
           🏪 Mağaza Giriş Ekranına Dön
-        </Link>
+        </button>
       </div>
     </div>
   );
@@ -179,9 +190,11 @@ const styles = {
     marginTop: '24px',
   },
   storeLink: {
+    background: 'none',
+    border: 'none',
     color: 'var(--krem)',
     opacity: 0.6,
-    textDecoration: 'none',
+    cursor: 'pointer',
     fontSize: '14px',
     fontWeight: '600',
   },

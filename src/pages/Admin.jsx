@@ -1,14 +1,24 @@
-'use client';
-
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
+import { db } from '../firebase';
+import {
+  collection,
+  getDocs,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
+  query,
+  orderBy,
+  where,
+  writeBatch
+} from 'firebase/firestore';
 
-export default function AdminDashboard() {
+export default function Admin({ navigate }) {
   const [activeTab, setActiveTab] = useState('raporlar'); // 'raporlar' | 'urunler' | 'magazalar'
   const [stores, setStores] = useState([]);
   const [products, setProducts] = useState([]);
   const [spins, setSpins] = useState([]);
+  const [filteredSpins, setFilteredSpins] = useState([]);
   const [stats, setStats] = useState({ totalSpins: 0, mostWonProduct: 'Yok' });
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -25,35 +35,26 @@ export default function AdminDashboard() {
   const [storeForm, setStoreForm] = useState({ id: '', name: '', username: '', password: '' });
   const [productForm, setProductForm] = useState({ id: '', name: '', chance: 20, color: '#2A6B40', text_color: '#FBF3E4', is_active: true });
 
-  const router = useRouter();
-
-  // Load all initial data
   useEffect(() => {
-    fetchData();
-  }, []);
-
-  // Fetch reports when filters change
-  useEffect(() => {
-    if (activeTab === 'raporlar') {
-      fetchReports();
+    // Check admin session
+    if (localStorage.getItem('admin_session') !== 'true') {
+      navigate('/admin/login');
+      return;
     }
-  }, [filterStore, filterDatePreset, filterStartDate, filterEndDate, activeTab]);
+
+    fetchData();
+  }, [navigate]);
+
+  // Handle local filtering whenever spins data or filter criteria change
+  useEffect(() => {
+    applyFilters();
+  }, [spins, filterStore, filterDatePreset, filterStartDate, filterEndDate]);
 
   const fetchData = async () => {
     setLoading(true);
+    setError('');
     try {
-      const authRes = await fetch('/api/auth/me');
-      if (!authRes.ok) {
-        router.push('/admin/login');
-        return;
-      }
-      const authData = await authRes.json();
-      if (authData.role !== 'admin') {
-        router.push('/');
-        return;
-      }
-
-      await Promise.all([fetchStores(), fetchProducts(), fetchReports()]);
+      await Promise.all([fetchStores(), fetchProducts(), fetchSpins()]);
     } catch (err) {
       console.error(err);
       setError('Veriler yüklenirken hata oluştu.');
@@ -63,63 +64,83 @@ export default function AdminDashboard() {
   };
 
   const fetchStores = async () => {
-    const res = await fetch('/api/admin/stores');
-    if (res.ok) {
-      const data = await res.json();
-      setStores(data);
-    }
+    const querySnapshot = await getDocs(query(collection(db, 'stores'), orderBy('created_at', 'desc')));
+    const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    setStores(data);
   };
 
   const fetchProducts = async () => {
-    const res = await fetch('/api/admin/products');
-    if (res.ok) {
-      const data = await res.json();
-      setProducts(data);
-    }
+    const querySnapshot = await getDocs(query(collection(db, 'products'), orderBy('created_at', 'asc')));
+    const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    setProducts(data);
   };
 
-  const fetchReports = async () => {
-    let url = `/api/admin/reports?store_id=${filterStore}`;
+  const fetchSpins = async () => {
+    const querySnapshot = await getDocs(query(collection(db, 'spins'), orderBy('created_at', 'desc')));
+    const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    setSpins(data);
+  };
 
-    // Handle date presets
-    let start = '';
-    let end = '';
+  const applyFilters = () => {
+    let result = [...spins];
+
+    // 1. Filter by Store
+    if (filterStore !== 'all') {
+      result = result.filter(s => s.store_id === filterStore);
+    }
+
+    // 2. Filter by Date
     const todayStr = new Date().toISOString().split('T')[0];
-
+    
     if (filterDatePreset === 'today') {
-      start = todayStr;
-      end = todayStr;
+      result = result.filter(s => s.created_at.split('T')[0] === todayStr);
     } else if (filterDatePreset === 'yesterday') {
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
       const yestStr = yesterday.toISOString().split('T')[0];
-      start = yestStr;
-      end = yestStr;
+      result = result.filter(s => s.created_at.split('T')[0] === yestStr);
     } else if (filterDatePreset === 'week') {
       const lastWeek = new Date();
       lastWeek.setDate(lastWeek.getDate() - 7);
-      start = lastWeek.toISOString().split('T')[0];
-      end = todayStr;
+      const lastWeekStr = lastWeek.toISOString().split('T')[0];
+      result = result.filter(s => s.created_at >= lastWeekStr);
     } else if (filterDatePreset === 'custom') {
-      start = filterStartDate;
-      end = filterEndDate;
+      if (filterStartDate) {
+        result = result.filter(s => s.created_at >= `${filterStartDate}T00:00:00`);
+      }
+      if (filterEndDate) {
+        result = result.filter(s => s.created_at <= `${filterEndDate}T23:59:59`);
+      }
     }
 
-    if (start) url += `&start_date=${start}`;
-    if (end) url += `&end_date=${end}`;
+    setFilteredSpins(result);
 
-    const res = await fetch(url);
-    if (res.ok) {
-      const data = await res.json();
-      setSpins(data.spins);
-      setStats(data.stats);
-    }
+    // 3. Process Statistics
+    const totalSpins = result.length;
+    const productCounts = {};
+    
+    result.forEach((spin) => {
+      productCounts[spin.product_name] = (productCounts[spin.product_name] || 0) + 1;
+    });
+
+    let mostWonProduct = 'Yok';
+    let maxWins = 0;
+    Object.entries(productCounts).forEach(([name, count]) => {
+      if (count > maxWins) {
+        maxWins = count;
+        mostWonProduct = name;
+      }
+    });
+
+    setStats({
+      totalSpins,
+      mostWonProduct: maxWins > 0 ? `${mostWonProduct} (${maxWins} kez)` : 'Yok'
+    });
   };
 
-  const handleAdminLogout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' });
-    router.push('/admin/login');
-    router.refresh();
+  const handleAdminLogout = () => {
+    localStorage.removeItem('admin_session');
+    navigate('/admin/login');
   };
 
   // --- STORES CRUD ---
@@ -131,16 +152,38 @@ export default function AdminDashboard() {
 
     try {
       const isEdit = !!storeForm.id;
-      const res = await fetch('/api/admin/stores', {
-        method: isEdit ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(storeForm),
-      });
+      const cleanUsername = storeForm.username.trim().toLowerCase();
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Şube kaydedilemedi.');
+      // Check username conflicts in Firestore
+      const conflictQuery = query(
+        collection(db, 'stores'),
+        where('username', '==', cleanUsername)
+      );
+      const conflictSnapshot = await getDocs(conflictQuery);
+      
+      const hasConflict = conflictSnapshot.docs.some(d => d.id !== storeForm.id);
+      if (hasConflict) {
+        throw new Error('Bu kullanıcı adı zaten kullanımda.');
+      }
 
-      setMessage(isEdit ? 'Şube başarıyla güncellendi!' : 'Yeni şube başarıyla eklendi!');
+      if (isEdit) {
+        const docRef = doc(db, 'stores', storeForm.id);
+        await updateDoc(docRef, {
+          name: storeForm.name.trim(),
+          username: cleanUsername,
+          password: storeForm.password.trim()
+        });
+        setMessage('Şube başarıyla güncellendi!');
+      } else {
+        await addDoc(collection(db, 'stores'), {
+          name: storeForm.name.trim(),
+          username: cleanUsername,
+          password: storeForm.password.trim(),
+          created_at: new Date().toISOString()
+        });
+        setMessage('Yeni şube başarıyla eklendi!');
+      }
+
       setStoreForm({ id: '', name: '', username: '', password: '' });
       fetchStores();
     } catch (err) {
@@ -151,19 +194,16 @@ export default function AdminDashboard() {
   };
 
   const handleStoreDelete = async (id) => {
-    if (!confirm('Bu şubeyi silmek istediğinizden emin misiniz? Şube oturumu sonlandırılacaktır.')) return;
+    if (!confirm('Bu şubeyi silmek istediğinizden emin misiniz?')) return;
     setError('');
     setMessage('');
 
     try {
-      const res = await fetch(`/api/admin/stores?id=${id}`, { method: 'DELETE' });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Şube silinemedi.');
-
+      await deleteDoc(doc(db, 'stores', id));
       setMessage('Şube silindi.');
       fetchStores();
     } catch (err) {
-      setError(err.message);
+      setError('Şube silinirken hata oluştu.');
     }
   };
 
@@ -176,20 +216,33 @@ export default function AdminDashboard() {
 
     try {
       const isEdit = !!productForm.id;
-      const res = await fetch('/api/admin/products', {
-        method: isEdit ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(productForm),
-      });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Ürün kaydedilemedi.');
+      if (isEdit) {
+        const docRef = doc(db, 'products', productForm.id);
+        await updateDoc(docRef, {
+          name: productForm.name.trim(),
+          chance: productForm.chance,
+          color: productForm.color,
+          text_color: productForm.text_color,
+          is_active: productForm.is_active
+        });
+        setMessage('Ürün başarıyla güncellendi!');
+      } else {
+        await addDoc(collection(db, 'products'), {
+          name: productForm.name.trim(),
+          chance: productForm.chance,
+          color: productForm.color,
+          text_color: productForm.text_color,
+          is_active: productForm.is_active,
+          created_at: new Date().toISOString()
+        });
+        setMessage('Yeni ürün başarıyla eklendi!');
+      }
 
-      setMessage(isEdit ? 'Ürün başarıyla güncellendi!' : 'Yeni ürün başarıyla eklendi!');
       setProductForm({ id: '', name: '', chance: 20, color: '#2A6B40', text_color: '#FBF3E4', is_active: true });
       fetchProducts();
     } catch (err) {
-      setError(err.message);
+      setError('Ürün kaydedilirken hata oluştu.');
     } finally {
       setSubmitting(false);
     }
@@ -201,14 +254,11 @@ export default function AdminDashboard() {
     setMessage('');
 
     try {
-      const res = await fetch(`/api/admin/products?id=${id}`, { method: 'DELETE' });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Ürün silinemedi.');
-
+      await deleteDoc(doc(db, 'products', id));
       setMessage('Ürün silindi.');
       fetchProducts();
     } catch (err) {
-      setError(err.message);
+      setError('Ürün silinirken hata oluştu.');
     }
   };
 
@@ -219,30 +269,33 @@ export default function AdminDashboard() {
     setMessage('');
 
     try {
-      const res = await fetch('/api/admin/reports', { method: 'DELETE' });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Geçmiş sıfırlanamadı.');
+      const spinsSnapshot = await getDocs(collection(db, 'spins'));
+      const batch = writeBatch(db);
+      
+      spinsSnapshot.docs.forEach(d => {
+        batch.delete(d.ref);
+      });
 
+      await batch.commit();
       setMessage('Tüm geçmiş başarıyla sıfırlandı.');
-      fetchReports();
+      fetchSpins();
     } catch (err) {
-      setError(err.message);
+      setError('Geçmiş sıfırlanamadı.');
     }
   };
 
-  // --- EXPORT TO EXCEL/CSV (TURKISH CHARS COMPATIBLE) ---
+  // --- EXPORT TO EXCEL/CSV ---
   const exportToCSV = () => {
-    if (spins.length === 0) return;
+    if (filteredSpins.length === 0) return;
     const headers = ['Şube Kodu/Adı', 'Kazanılan Hediye', 'Fiş No', 'Tarih & Saat'];
-    const rows = spins.map(spin => [
+    const rows = filteredSpins.map(spin => [
       spin.store_name,
       spin.product_name,
       spin.receipt_no || '-',
       new Date(spin.created_at).toLocaleString('tr-TR')
     ]);
 
-    // Use UTF-8 BOM (\uFEFF) to make sure MS Excel decodes Turkish characters correctly
-    let csvContent = "\uFEFF";
+    let csvContent = "\uFEFF"; // UTF-8 BOM
     csvContent += headers.join(';') + '\n';
     rows.forEach(row => {
       const escapedRow = row.map(val => `"${val.replace(/"/g, '""')}"`);
@@ -259,7 +312,6 @@ export default function AdminDashboard() {
     document.body.removeChild(link);
   };
 
-  // Pre-configured brand colors for products
   const colorPresets = [
     { bg: '#2A6B40', text: '#FBF3E4' },
     { bg: '#D9A441', text: '#123A20' },
@@ -289,22 +341,20 @@ export default function AdminDashboard() {
           <strong>Hediye Çarkı Yönetim Paneli</strong>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
-          <Link href="/" target="_blank" style={styles.liveLink}>
+          <button onClick={() => navigate('/')} style={styles.liveLink}>
             👁️ Canlı Çark Ekranı
-          </Link>
+          </button>
           <button onClick={handleAdminLogout} style={styles.logoutBtn}>
             Güvenli Çıkış 🚪
           </button>
         </div>
       </div>
 
-      {/* Main Container */}
       <div className="container" style={{ width: '100%', marginTop: '30px' }}>
-        {/* Alerts */}
         {error && <div style={styles.errorBox}>{error}</div>}
         {message && <div style={styles.successBox}>{message}</div>}
 
-        {/* Glass Tabs */}
+        {/* Tabs Headers */}
         <div className="glass-card" style={styles.tabsHeader}>
           <button
             style={{
@@ -350,11 +400,9 @@ export default function AdminDashboard() {
         {/* TAB 1: REPORTS */}
         {activeTab === 'raporlar' && (
           <div>
-            {/* Filter Dashboard */}
             <div className="glass-card" style={styles.filterCard}>
               <h3 style={{ marginBottom: '16px', color: 'var(--altin)' }}>Rapor Filtreleri</h3>
               <div style={styles.filterGrid}>
-                {/* Store Filter */}
                 <div style={styles.filterGroup}>
                   <label style={styles.filterLabel}>Mağaza Şubesi</label>
                   <select
@@ -369,7 +417,6 @@ export default function AdminDashboard() {
                   </select>
                 </div>
 
-                {/* Date Preset Filter */}
                 <div style={styles.filterGroup}>
                   <label style={styles.filterLabel}>Zaman Aralığı</label>
                   <select
@@ -385,7 +432,6 @@ export default function AdminDashboard() {
                   </select>
                 </div>
 
-                {/* Custom Dates */}
                 {filterDatePreset === 'custom' && (
                   <>
                     <div style={styles.filterGroup}>
@@ -411,7 +457,6 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Metric Summary Cards */}
             <div style={styles.summaryGrid}>
               <div className="glass-card" style={styles.summaryCard}>
                 <div style={styles.summaryNumber}>{stats.totalSpins}</div>
@@ -423,7 +468,6 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Logs Table Area */}
             <div className="glass-card" style={{ padding: '24px', overflowX: 'auto' }}>
               <div style={styles.tableHeaderSection}>
                 <h3 style={{ color: 'var(--altin)' }}>Spin Kayıt Detayları</h3>
@@ -431,7 +475,7 @@ export default function AdminDashboard() {
                   <button
                     onClick={exportToCSV}
                     style={styles.csvBtn}
-                    disabled={spins.length === 0}
+                    disabled={filteredSpins.length === 0}
                   >
                     📊 CSV / Excel Olarak İndir
                   </button>
@@ -444,7 +488,7 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {spins.length > 0 ? (
+              {filteredSpins.length > 0 ? (
                 <table style={styles.table}>
                   <thead>
                     <tr style={styles.tableHeaderRow}>
@@ -455,7 +499,7 @@ export default function AdminDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {spins.map((spin) => (
+                    {filteredSpins.map((spin) => (
                       <tr key={spin.id} style={styles.tableRow}>
                         <td style={styles.tableTd}>{spin.store_name}</td>
                         <td style={styles.tableTd}>
@@ -473,7 +517,7 @@ export default function AdminDashboard() {
                 </table>
               ) : (
                 <div style={styles.noDataBox}>
-                  Seçili filtrelerde kayıt bulunamadı. Mağazalar çarkı çevirdikçe veriler anlık buraya düşecektir.
+                  Kayıt bulunamadı.
                 </div>
               )}
             </div>
@@ -483,7 +527,6 @@ export default function AdminDashboard() {
         {/* TAB 2: PRODUCTS CRUD */}
         {activeTab === 'urunler' && (
           <div style={styles.crudContainer}>
-            {/* Form */}
             <div className="glass-card" style={styles.crudFormCard}>
               <h3 style={{ color: 'var(--altin)', marginBottom: '20px' }}>
                 {productForm.id ? 'Ürünü Düzenle' : 'Yeni Hediye Ekle'}
@@ -513,11 +556,10 @@ export default function AdminDashboard() {
                     required
                   />
                   <small style={styles.formHelp}>
-                    Örn: <strong>10</strong> girilirse ortalama her 10 çevirmede bir gelir. <strong>0</strong> girilirse çarkta görünür fakat hiç çıkmaz.
+                    Örn: <strong>10</strong> → 10 çevirmede 1 kez çıkar. <strong>0</strong> → çarkta görünür fakat hiç çıkmaz.
                   </small>
                 </div>
 
-                {/* Colors picker */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div style={styles.formGroup}>
                     <label style={styles.formLabel}>Dilim Arka Plan</label>
@@ -539,7 +581,6 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                {/* Presets color boxes */}
                 <div style={styles.presetSection}>
                   <span style={styles.presetLabel}>Renk Şablonları:</span>
                   <div style={styles.presetGrid}>
@@ -549,7 +590,6 @@ export default function AdminDashboard() {
                         type="button"
                         style={{ ...styles.presetBox, backgroundColor: p.bg, border: `2px solid ${p.text}` }}
                         onClick={() => setProductForm({ ...productForm, color: p.bg, text_color: p.text })}
-                        title={`bg: ${p.bg}, text: ${p.text}`}
                       />
                     ))}
                   </div>
@@ -590,7 +630,6 @@ export default function AdminDashboard() {
               </form>
             </div>
 
-            {/* List */}
             <div className="glass-card" style={styles.crudListCard}>
               <h3 style={{ color: 'var(--altin)', marginBottom: '20px' }}>
                 Hediye Ürün Listesi ({products.length} adet)
@@ -647,7 +686,7 @@ export default function AdminDashboard() {
                 </div>
               ) : (
                 <div style={styles.noDataBox}>
-                  Sistemde hediye tanımlanmamış. Sol taraftan hediye ekleyebilirsiniz.
+                  Sistemde hediye tanımlanmamış.
                 </div>
               )}
             </div>
@@ -657,7 +696,6 @@ export default function AdminDashboard() {
         {/* TAB 3: STORES CRUD */}
         {activeTab === 'magazalar' && (
           <div style={styles.crudContainer}>
-            {/* Form */}
             <div className="glass-card" style={styles.crudFormCard}>
               <h3 style={{ color: 'var(--altin)', marginBottom: '20px' }}>
                 {storeForm.id ? 'Şubeyi Düzenle' : 'Yeni Şube Ekle'}
@@ -721,7 +759,6 @@ export default function AdminDashboard() {
               </form>
             </div>
 
-            {/* List */}
             <div className="glass-card" style={styles.crudListCard}>
               <h3 style={{ color: 'var(--altin)', marginBottom: '20px' }}>
                 Aktif Şube Listesi ({stores.length} adet)
@@ -757,7 +794,7 @@ export default function AdminDashboard() {
                 </div>
               ) : (
                 <div style={styles.noDataBox}>
-                  Sistemde şube tanımlanmamış. Sol taraftan ekleyebilirsiniz.
+                  Sistemde şube tanımlanmamış.
                 </div>
               )}
             </div>
@@ -817,14 +854,12 @@ const styles = {
     fontSize: '20px',
   },
   liveLink: {
-    color: 'var(--altin)',
-    textDecoration: 'none',
-    fontSize: '14px',
-    fontWeight: '700',
-    display: 'flex',
-    alignItems: 'center',
     background: 'rgba(217, 164, 65, 0.1)',
     border: '1px solid var(--altin)',
+    color: 'var(--altin)',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '700',
     padding: '6px 12px',
     borderRadius: '8px',
     transition: 'all 0.2s',
@@ -991,9 +1026,6 @@ const styles = {
   tableRow: {
     borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
     transition: 'background 0.2s',
-    '&:hover': {
-      background: 'rgba(255,255,255,0.02)'
-    }
   },
   tableTd: {
     padding: '14px 12px',
@@ -1136,9 +1168,6 @@ const styles = {
     cursor: 'pointer',
     fontSize: '12px',
     transition: 'all 0.2s',
-    '&:hover': {
-      background: 'rgba(217, 164, 65, 0.1)'
-    }
   },
   delBtn: {
     background: 'none',
@@ -1150,8 +1179,5 @@ const styles = {
     cursor: 'pointer',
     fontSize: '12px',
     transition: 'all 0.2s',
-    '&:hover': {
-      background: 'rgba(179, 64, 47, 0.1)'
-    }
   },
 };

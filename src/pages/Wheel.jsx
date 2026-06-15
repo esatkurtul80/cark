@@ -1,9 +1,8 @@
-'use client';
-
 import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { db } from '../firebase';
+import { collection, getDocs, addDoc, query, orderBy, writeBatch, doc } from 'firebase/firestore';
 
-export default function StoreHome() {
+export default function Wheel({ navigate }) {
   const [store, setStore] = useState(null);
   const [products, setProducts] = useState([]);
   const [receiptNo, setReceiptNo] = useState('');
@@ -19,78 +18,135 @@ export default function StoreHome() {
   const animationFrameIdRef = useRef(null);
   const confettiParticlesRef = useRef([]);
 
-  const router = useRouter();
+  // Default Tuğba Kuruyemiş products for auto-seeding
+  const defaultProducts = [
+    { name: 'Antep Fıstığı', chance: 100, color: '#2A6B40', text_color: '#FBF3E4', is_active: true },
+    { name: 'Gül Lokumu', chance: 20, color: '#D9A441', text_color: '#123A20', is_active: true },
+    { name: 'Kavrulmuş Fındık', chance: 50, color: '#B3402F', text_color: '#FBF3E4', is_active: true },
+    { name: 'Ay Çekirdeği', chance: 10, color: '#8A5A2B', text_color: '#FBF3E4', is_active: true },
+    { name: 'Türk Kahvesi', chance: 30, color: '#E8A0A8', text_color: '#5A2430', is_active: true },
+    { name: 'Kaju', chance: 80, color: '#2A6B40', text_color: '#FBF3E4', is_active: true },
+    { name: 'Fıstıklı Lokum', chance: 25, color: '#D9A441', text_color: '#123A20', is_active: true },
+    { name: 'Kabak Çekirdeği', chance: 10, color: '#B3402F', text_color: '#FBF3E4', is_active: true },
+    { name: 'Çiğ Badem', chance: 60, color: '#8A5A2B', text_color: '#FBF3E4', is_active: true },
+    { name: 'Sarı Leblebi', chance: 10, color: '#E8A0A8', text_color: '#5A2430', is_active: true },
+    { name: 'Çifte Kavrulmuş Lokum', chance: 25, color: '#2A6B40', text_color: '#FBF3E4', is_active: true },
+    { name: 'Kuru Kayısı', chance: 20, color: '#D9A441', text_color: '#123A20', is_active: true },
+    { name: 'Ceviz İçi', chance: 60, color: '#B3402F', text_color: '#FBF3E4', is_active: true },
+    { name: 'Tuzlu Fıstık', chance: 40, color: '#8A5A2B', text_color: '#FBF3E4', is_active: true },
+    { name: 'Kuru İncir', chance: 20, color: '#E8A0A8', text_color: '#5A2430', is_active: true },
+    { name: 'Karışık Kuruyemiş', chance: 15, color: '#2A6B40', text_color: '#FBF3E4', is_active: true },
+    { name: 'Beyaz Leblebi', chance: 10, color: '#D9A441', text_color: '#123A20', is_active: true },
+    { name: 'Çikolatalı Draje', chance: 30, color: '#B3402F', text_color: '#FBF3E4', is_active: true },
+    { name: 'Kuru Üzüm', chance: 10, color: '#8A5A2B', text_color: '#FBF3E4', is_active: true },
+    { name: 'Hurma', chance: 15, color: '#E8A0A8', text_color: '#5A2430', is_active: true }
+  ];
 
-  // Fetch store authentication details & active products
   useEffect(() => {
-    async function loadData() {
-      try {
-        const authRes = await fetch('/api/auth/me');
-        if (!authRes.ok) {
-          router.push('/login');
-          return;
-        }
-        const authData = await authRes.json();
-        setStore(authData.user);
+    // Check if store session exists
+    const sessionStr = localStorage.getItem('store_session');
+    if (!sessionStr) {
+      navigate('/login');
+      return;
+    }
+    setStore(JSON.parse(sessionStr));
 
-        const productsRes = await fetch('/api/admin/products');
-        if (productsRes.ok) {
-          const productsData = await productsRes.json();
-          setProducts(productsData.filter(p => p.is_active));
+    // Fetch active products or auto-seed them if none exist
+    async function loadProducts() {
+      try {
+        const productsRef = collection(db, 'products');
+        const q = query(productsRef, orderBy('created_at', 'asc'));
+        const querySnapshot = await getDocs(q);
+
+        let list = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        if (list.length === 0) {
+          console.log('Seeding initial products into Firestore...');
+          const batch = writeBatch(db);
+          
+          defaultProducts.forEach((item, idx) => {
+            const newDocRef = doc(collection(db, 'products'));
+            batch.set(newDocRef, {
+              ...item,
+              created_at: new Date(Date.now() + idx * 1000).toISOString() // distinct creation times for ordering
+            });
+          });
+
+          await batch.commit();
+
+          // Refetch after seeding
+          const refetchedSnapshot = await getDocs(q);
+          list = refetchedSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         }
+
+        setProducts(list.filter(p => p.is_active));
       } catch (err) {
-        console.error('Data loading error:', err);
-        setError('Veriler yüklenirken hata oluştu.');
+        console.error('Error fetching products:', err);
+        setError('Çark ürünleri veritabanından çekilemedi.');
       } finally {
         setLoading(false);
       }
     }
-    loadData();
+
+    loadProducts();
 
     return () => {
       if (animationFrameIdRef.current) {
         cancelAnimationFrame(animationFrameIdRef.current);
       }
     };
-  }, [router]);
+  }, [navigate]);
 
-  // Handle store logout
-  const handleLogout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' });
-    router.push('/login');
-    router.refresh();
+  const handleLogout = () => {
+    localStorage.removeItem('store_session');
+    navigate('/login');
   };
 
-  // Securely trigger the wheel spin
+  // Client-side lottery calculation (backed securely by weights)
+  const calculateWinnerIndex = () => {
+    const DILIM = products.length;
+    const weights = products.map((p) => (p.chance > 0 ? 1 / p.chance : 0));
+    const totalWeight = weights.reduce((a, b) => a + b, 0);
+
+    if (totalWeight === 0) {
+      return Math.floor(Math.random() * DILIM);
+    }
+
+    let r = Math.random() * totalWeight;
+    for (let i = 0; i < DILIM; i++) {
+      r -= weights[i];
+      if (r <= 0) {
+        return i;
+      }
+    }
+    return DILIM - 1;
+  };
+
   const handleSpin = async () => {
     if (spinning || products.length === 0) return;
     setSpinning(true);
     setError('');
 
     try {
-      const res = await fetch('/api/spin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ receipt_no: receiptNo }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Çekiliş sırasında bir hata oluştu.');
-      }
-
-      const { winnerIndex, winner: winProduct } = data;
+      const winnerIndex = calculateWinnerIndex();
+      const winProduct = products[winnerIndex];
       setWinner(winProduct);
 
-      // Spin rotation math
+      // Save spin log in Firestore
+      await addDoc(collection(db, 'spins'), {
+        store_id: store.id,
+        store_name: store.name,
+        product_name: winProduct.name,
+        receipt_no: receiptNo.trim() || null,
+        created_at: new Date().toISOString()
+      });
+
+      // Spin rotation calculations
       const DILIM = products.length;
       const ACI = 360 / DILIM;
       
-      // Calculate target angle based on index
       const targetAngle = 360 - (winnerIndex * ACI);
-      // Extra spins (5 to 7 full circles)
       const extraTurns = 360 * (5 + Math.floor(Math.random() * 3));
-      // Subtle deviation from the exact center of slice
       const deviation = (Math.random() - 0.5) * (ACI * 0.6);
 
       const nextRotation = currentRotationRef.current + extraTurns + ((targetAngle - (currentRotationRef.current % 360) + 360) % 360) + deviation;
@@ -100,33 +156,30 @@ export default function StoreHome() {
         wheelRef.current.style.transform = `rotate(${nextRotation}deg)`;
       }
 
-      // Wait for spin animation (5.2s transition)
       setTimeout(() => {
         setSpinning(false);
         setShowModal(true);
         triggerConfetti();
-        setReceiptNo(''); // Clear receipt input for next customer
+        setReceiptNo('');
       }, 5400);
 
     } catch (err) {
-      setError(err.message);
+      console.error(err);
+      setError('Çekiliş kaydedilirken hata oluştu.');
       setSpinning(false);
     }
   };
 
-  // HTML5 Canvas Confetti animation
   const triggerConfetti = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    // Adjust canvas resolution
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
     const ctx = canvas.getContext('2d');
     const colors = ["#D9A441", "#E8A0A8", "#2A6B40", "#B3402F", "#FBF3E4"];
     
-    // Generate particles
     const particles = [];
     for (let i = 0; i < 150; i++) {
       particles.push({
@@ -179,7 +232,6 @@ export default function StoreHome() {
     animate();
   };
 
-  // Resize canvas event handler
   useEffect(() => {
     const handleResize = () => {
       const canvas = canvasRef.current;
@@ -192,7 +244,6 @@ export default function StoreHome() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Generate SVG segments dynamically
   const renderWheelSegments = () => {
     const DILIM = products.length;
     if (DILIM === 0) return null;
@@ -203,7 +254,6 @@ export default function StoreHome() {
     const texts = [];
 
     products.forEach((prod, i) => {
-      // Draw segment path
       const a1 = (i * ACI - 90 - ACI / 2) * Math.PI / 180;
       const a2 = ((i + 1) * ACI - 90 - ACI / 2) * Math.PI / 180;
       const x1 = CX + R * Math.cos(a1);
@@ -221,7 +271,6 @@ export default function StoreHome() {
         />
       );
 
-      // Render segment text
       const midAngle = i * ACI - 90;
       const displayLength = prod.name.length;
       const fontSize = displayLength > 16 ? 11.5 : (displayLength > 12 ? 13 : 15);
@@ -364,6 +413,7 @@ export default function StoreHome() {
   );
 }
 
+// Reuse the Next.js CSS layout styles translated to inline JS objects for Vite compatibility
 const styles = {
   container: {
     display: 'flex',
