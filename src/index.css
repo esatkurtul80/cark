@@ -386,3 +386,18 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
+/* Ken Burns slow panning effect for slideshow */
+@keyframes kenBurnsEffect {
+  0% {
+    transform: scale(1) translate(0, 0);
+  }
+  100% {
+    transform: scale(1.08) translate(-1.5%, -1%);
+  }
+}
+
+.ken-burns-active {
+  animation: kenBurnsEffect 10s ease-out infinite alternate;
+}
+
+

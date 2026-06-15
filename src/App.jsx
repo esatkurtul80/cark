@@ -3,11 +3,13 @@ import Welcome from './pages/Welcome';
 import Wheel from './pages/Wheel';
 import Login from './pages/Login';
 import Admin from './pages/Admin';
+import Screensaver from './pages/Screensaver';
 import { playClick } from './utils/audio';
 
 export default function App() {
   const [hasStarted, setHasStarted] = useState(false);
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
+  const [isScreensaverActive, setIsScreensaverActive] = useState(false);
 
   // Synchronize state with history popstate
   useEffect(() => {
@@ -19,6 +21,38 @@ export default function App() {
       window.removeEventListener('popstate', handleLocationChange);
     };
   }, []);
+
+  // Monitor user activity to trigger screensaver after 30 seconds of inactivity
+  useEffect(() => {
+    const isAdminRoute = currentPath.startsWith('/admin');
+    if (isAdminRoute) {
+      setIsScreensaverActive(false);
+      return;
+    }
+
+    let timeoutId;
+
+    const resetTimer = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        setIsScreensaverActive(true);
+      }, 30000); // 30 seconds
+    };
+
+    const events = ['mousedown', 'mousemove', 'keypress', 'touchstart', 'scroll', 'click'];
+    events.forEach((event) => {
+      window.addEventListener(event, resetTimer);
+    });
+
+    resetTimer();
+
+    return () => {
+      clearTimeout(timeoutId);
+      events.forEach((event) => {
+        window.removeEventListener(event, resetTimer);
+      });
+    };
+  }, [currentPath]);
 
   const navigate = (path) => {
     playClick();
@@ -66,8 +100,13 @@ export default function App() {
   const storeSession = getStoreSession();
   const adminSession = getAdminSession();
 
-  // If the user hasn't clicked "Dokunun" to start and is on a public route, show welcome page
+  // If the screensaver is active and we are not on an admin route, show the product showcase
   const isAdminRoute = currentPath.startsWith('/admin');
+  if (isScreensaverActive && !isAdminRoute) {
+    return <Screensaver onClose={() => setIsScreensaverActive(false)} />;
+  }
+
+  // If the user hasn't clicked "Dokunun" to start and is on a public route, show welcome page
   if (!hasStarted && !isAdminRoute) {
     return <Welcome onStart={() => setHasStarted(true)} />;
   }
