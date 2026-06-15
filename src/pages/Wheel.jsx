@@ -49,7 +49,13 @@ export default function Wheel({ navigate }) {
       navigate('/login');
       return;
     }
-    setStore(JSON.parse(sessionStr));
+    try {
+      setStore(JSON.parse(sessionStr));
+    } catch (e) {
+      localStorage.removeItem('store_session');
+      navigate('/login');
+      return;
+    }
 
     async function loadProducts() {
       try {
