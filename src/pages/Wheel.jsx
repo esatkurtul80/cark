@@ -144,6 +144,12 @@ export default function Wheel({ navigate }) {
 
   const handleSpin = async () => {
     if (spinning || products.length === 0) return;
+    
+    if (!receiptNo.trim()) {
+      setError('Lütfen fiş numarasını giriniz.');
+      return;
+    }
+
     playClick();
     setSpinning(true);
     setError('');
@@ -388,7 +394,15 @@ export default function Wheel({ navigate }) {
                 </div>
               )}
             </div>
-            <div className="gobek" style={styles.gobek} onClick={handleSpin}>
+            <div
+              className="gobek"
+              style={{
+                ...styles.gobek,
+                opacity: !receiptNo.trim() ? 0.6 : 1,
+                cursor: !receiptNo.trim() ? 'not-allowed' : 'pointer'
+              }}
+              onClick={handleSpin}
+            >
               ÇEVİR!
             </div>
           </div>
@@ -405,7 +419,7 @@ export default function Wheel({ navigate }) {
           </div>
 
           <div className="wheel-input-area">
-            <label className="wheel-input-label">Fiş Numarası (Opsiyonel)</label>
+            <label className="wheel-input-label">Fiş Numarası (Zorunlu)</label>
             <input
               type="text"
               placeholder="Örn: TR-12345"
@@ -413,13 +427,14 @@ export default function Wheel({ navigate }) {
               onChange={(e) => setReceiptNo(e.target.value)}
               className="glass-input wheel-receipt-input"
               disabled={spinning}
+              required
             />
           </div>
 
           <button
             className="btn-primary wheel-spin-btn"
             onClick={handleSpin}
-            disabled={spinning || products.length === 0}
+            disabled={spinning || products.length === 0 || !receiptNo.trim()}
           >
             {spinning ? 'ÇARK DÖNÜYOR...' : 'ÇARKI ÇEVİR'}
           </button>
