@@ -46,14 +46,14 @@ export default function Wheel({ navigate }) {
   useEffect(() => {
     const sessionStr = localStorage.getItem('store_session');
     if (!sessionStr) {
-      navigate('/login');
+      navigate('/');
       return;
     }
     try {
       setStore(JSON.parse(sessionStr));
     } catch (e) {
       localStorage.removeItem('store_session');
-      navigate('/login');
+      navigate('/');
       return;
     }
 
@@ -103,7 +103,7 @@ export default function Wheel({ navigate }) {
 
   const handleLogout = () => {
     localStorage.removeItem('store_session');
-    navigate('/login');
+    navigate('/');
   };
 
   const calculateWinnerIndex = () => {

@@ -39,15 +39,9 @@ export default function App() {
 
   // Perform redirects in useEffect to prevent rendering side effects
   useEffect(() => {
-    const storeSession = getStoreSession();
     const adminSession = getAdminSession();
 
-    if (currentPath === '/login') {
-      if (storeSession) {
-        window.history.replaceState({}, '', '/');
-        setCurrentPath('/');
-      }
-    } else if (currentPath === '/admin/login') {
+    if (currentPath === '/admin/login') {
       if (adminSession) {
         window.history.replaceState({}, '', '/admin');
         setCurrentPath('/admin');
@@ -57,17 +51,14 @@ export default function App() {
         window.history.replaceState({}, '', '/admin/login');
         setCurrentPath('/admin/login');
       }
-    } else {
-      // Default fallback (root '/' or unknown paths)
-      if (!storeSession) {
-        window.history.replaceState({}, '', '/login');
-        setCurrentPath('/login');
-      }
+    } else if (currentPath === '/login') {
+      // Clean up any old bookmarks/references to /login by replacing history with root
+      window.history.replaceState({}, '', '/');
+      setCurrentPath('/');
     }
   }, [currentPath]);
 
   // Determine what to display based on currentPath and session state
-  // This does NOT modify the history during render.
   const storeSession = getStoreSession();
   const adminSession = getAdminSession();
 
@@ -87,19 +78,12 @@ export default function App() {
     }
   }
 
-  if (currentPath === '/login') {
-    if (storeSession) {
-      return <Wheel navigate={navigate} />;
-    } else {
-      return <Login navigate={navigate} defaultView="select" />;
-    }
-  }
-
-  // Root path / or unknown paths
+  // Root path '/' or any unknown paths (fallback to store view)
   if (storeSession) {
     return <Wheel navigate={navigate} />;
   } else {
     return <Login navigate={navigate} defaultView="select" />;
   }
 }
+
 
