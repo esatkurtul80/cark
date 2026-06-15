@@ -45,15 +45,15 @@ export const playTick = () => {
     gain.connect(audioCtx.destination);
     
     osc.type = 'triangle';
-    osc.frequency.setValueAtTime(140, audioCtx.currentTime);
-    osc.frequency.setValueAtTime(650, audioCtx.currentTime + 0.004);
-    osc.frequency.exponentialRampToValueAtTime(90, audioCtx.currentTime + 0.04);
+    osc.frequency.setValueAtTime(160, audioCtx.currentTime);
+    osc.frequency.setValueAtTime(700, audioCtx.currentTime + 0.003);
+    osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.035);
     
-    gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.04);
+    gain.gain.setValueAtTime(0.55, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.035);
     
     osc.start();
-    osc.stop(audioCtx.currentTime + 0.04);
+    osc.stop(audioCtx.currentTime + 0.035);
   } catch (e) {
     console.warn('Audio play failed:', e);
   }
