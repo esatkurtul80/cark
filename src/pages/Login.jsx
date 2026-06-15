@@ -3,7 +3,7 @@ import { db } from '../firebase';
 import { collection, query, where, getDocs, doc, getDoc, setDoc } from 'firebase/firestore';
 import { playClick } from '../utils/audio';
 
-export default function Login({ navigate, defaultView = 'select' }) {
+export default function Login({ navigate, defaultView = 'select', onLogin, onAdminLogin }) {
   const [view, setView] = useState(defaultView); // 'select' | 'store' | 'admin'
   
   useEffect(() => {
@@ -48,6 +48,7 @@ export default function Login({ navigate, defaultView = 'select' }) {
         })
       );
 
+      if (onLogin) onLogin();
       navigate('/');
     } catch (err) {
       setError(err.message);
@@ -87,7 +88,7 @@ export default function Login({ navigate, defaultView = 'select' }) {
         username.trim() === expectedUsername &&
         password === expectedPassword
       ) {
-        localStorage.setItem('admin_session', 'true');
+        if (onAdminLogin) onAdminLogin();
         navigate('/admin');
       } else {
         throw new Error('Geçersiz yönetici adı veya şifre.');

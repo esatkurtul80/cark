@@ -14,7 +14,7 @@ import {
 } from 'firebase/firestore';
 import { playClick } from '../utils/audio';
 
-export default function Admin({ navigate }) {
+export default function Admin({ navigate, onLogout }) {
   const [activeTab, setActiveTab] = useState('raporlar'); // 'raporlar' | 'urunler' | 'magazalar'
   const [stores, setStores] = useState([]);
   const [products, setProducts] = useState([]);
@@ -141,8 +141,12 @@ export default function Admin({ navigate }) {
 
   const handleAdminLogout = () => {
     playClick();
-    localStorage.removeItem('admin_session');
-    navigate('/admin/login');
+    if (onLogout) {
+      onLogout();
+    } else {
+      localStorage.removeItem('admin_session');
+      navigate('/admin/login');
+    }
   };
 
   // --- STORES CRUD ---

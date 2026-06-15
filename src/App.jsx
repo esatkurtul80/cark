@@ -7,6 +7,25 @@ import { playClick } from './utils/audio';
 export default function App() {
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
 
+  const getStoreSession = () => {
+    const session = localStorage.getItem('store_session');
+    if (!session) return null;
+    try {
+      return JSON.parse(session);
+    } catch (e) {
+      localStorage.removeItem('store_session');
+      return null;
+    }
+  };
+
+  const getAdminSession = () => {
+    return localStorage.getItem('admin_session') === 'true';
+  };
+
+  // Reactive session states to trigger layout updates immediately
+  const [storeSession, setStoreSession] = useState(() => getStoreSession());
+  const [adminSession, setAdminSession] = useState(() => getAdminSession());
+
   // Synchronize state with history popstate
   useEffect(() => {
     const handleLocationChange = () => {
@@ -24,25 +43,8 @@ export default function App() {
     setCurrentPath(path);
   };
 
-  const getStoreSession = () => {
-    const session = localStorage.getItem('store_session');
-    if (!session) return null;
-    try {
-      return JSON.parse(session);
-    } catch (e) {
-      localStorage.removeItem('store_session');
-      return null;
-    }
-  };
-
-  const getAdminSession = () => {
-    return localStorage.getItem('admin_session') === 'true';
-  };
-
   // Perform redirects in useEffect to prevent rendering side effects
   useEffect(() => {
-    const adminSession = getAdminSession();
-
     if (currentPath === '/admin/login') {
       if (adminSession) {
         window.history.replaceState({}, '', '/admin');
@@ -58,33 +60,48 @@ export default function App() {
       window.history.replaceState({}, '', '/');
       setCurrentPath('/');
     }
-  }, [currentPath]);
+  }, [currentPath, adminSession]);
 
-  // Determine what to display based on currentPath and session state
-  const storeSession = getStoreSession();
-  const adminSession = getAdminSession();
+  const handleStoreLogin = () => {
+    setStoreSession(getStoreSession());
+  };
 
+  const handleAdminLogin = () => {
+    setAdminSession(true);
+  };
+
+  const handleStoreLogout = () => {
+    localStorage.removeItem('store_session');
+    setStoreSession(null);
+  };
+
+  const handleAdminLogout = () => {
+    localStorage.removeItem('admin_session');
+    setAdminSession(false);
+  };
+
+  // Route Rendering
   if (currentPath === '/admin') {
     if (adminSession) {
-      return <Admin navigate={navigate} />;
+      return <Admin navigate={navigate} onLogout={handleAdminLogout} />;
     } else {
-      return <Login navigate={navigate} defaultView="admin" />;
+      return <Login navigate={navigate} defaultView="admin" onAdminLogin={handleAdminLogin} />;
     }
   }
 
   if (currentPath === '/admin/login') {
     if (adminSession) {
-      return <Admin navigate={navigate} />;
+      return <Admin navigate={navigate} onLogout={handleAdminLogout} />;
     } else {
-      return <Login navigate={navigate} defaultView="admin" />;
+      return <Login navigate={navigate} defaultView="admin" onAdminLogin={handleAdminLogin} />;
     }
   }
 
   // Root path '/' or any unknown paths (fallback to store view)
   if (storeSession) {
-    return <Wheel navigate={navigate} />;
+    return <Wheel navigate={navigate} onLogout={handleStoreLogout} />;
   } else {
-    return <Login navigate={navigate} defaultView="select" />;
+    return <Login navigate={navigate} defaultView="select" onLogin={handleStoreLogin} />;
   }
 }
 

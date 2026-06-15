@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase';
-import { collection, getDocs, addDoc, query, orderBy, writeBatch, doc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, query, orderBy, writeBatch, doc, onSnapshot } from 'firebase/firestore';
 import { playClick, playTick, playWin } from '../utils/audio';
 
 const getRotationDegrees = (element) => {
@@ -20,7 +20,7 @@ const getRotationDegrees = (element) => {
   return angle;
 };
 
-export default function Wheel({ navigate }) {
+export default function Wheel({ navigate, onLogout }) {
   const [store, setStore] = useState(null);
   const [products, setProducts] = useState([]);
   const [receiptNo, setReceiptNo] = useState('');
@@ -73,18 +73,16 @@ export default function Wheel({ navigate }) {
       return;
     }
 
-    async function loadProducts() {
-      try {
-        const productsRef = collection(db, 'products');
-        const q = query(productsRef, orderBy('created_at', 'asc'));
-        const querySnapshot = await getDocs(q);
+    const productsRef = collection(db, 'products');
+    const q = query(productsRef, orderBy('created_at', 'asc'));
 
-        let list = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const unsubscribe = onSnapshot(q, async (querySnapshot) => {
+      let list = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-        if (list.length === 0) {
-          console.log('Seeding initial products into Firestore...');
+      if (list.length === 0) {
+        console.log('Seeding initial products into Firestore...');
+        try {
           const batch = writeBatch(db);
-          
           defaultProducts.forEach((item, idx) => {
             const newDocRef = doc(collection(db, 'products'));
             batch.set(newDocRef, {
@@ -92,25 +90,22 @@ export default function Wheel({ navigate }) {
               created_at: new Date(Date.now() + idx * 1000).toISOString()
             });
           });
-
           await batch.commit();
-
-          const refetchedSnapshot = await getDocs(q);
-          list = refetchedSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        } catch (err) {
+          console.error('Error seeding products:', err);
         }
-
+      } else {
         setProducts(list.filter(p => p.is_active));
-      } catch (err) {
-        console.error('Error fetching products:', err);
-        setError('Çark ürünleri veritabanından çekilemedi.');
-      } finally {
         setLoading(false);
       }
-    }
-
-    loadProducts();
+    }, (err) => {
+      console.error('Error listening to products:', err);
+      setError('Çark ürünleri veritabanından çekilemedi.');
+      setLoading(false);
+    });
 
     return () => {
+      unsubscribe();
       if (animationFrameIdRef.current) {
         cancelAnimationFrame(animationFrameIdRef.current);
       }
@@ -119,8 +114,12 @@ export default function Wheel({ navigate }) {
 
   const handleLogout = () => {
     playClick();
-    localStorage.removeItem('store_session');
-    navigate('/');
+    if (onLogout) {
+      onLogout();
+    } else {
+      localStorage.removeItem('store_session');
+      navigate('/');
+    }
   };
 
   const calculateWinnerIndex = () => {
