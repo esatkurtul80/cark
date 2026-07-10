@@ -3,37 +3,60 @@ import { db } from '../firebase';
 import { collection, query, where, getDocs, doc, getDoc, setDoc } from 'firebase/firestore';
 import { playClick } from '../utils/audio';
 
-export default function Login({ navigate, defaultView = 'select', onLogin, onAdminLogin }) {
-  const [view, setView] = useState(defaultView); // 'select' | 'store' | 'admin'
-  
-  useEffect(() => {
-    setView(defaultView);
-  }, [defaultView]);
-
+export default function Login({ navigate, onLogin, onAdminLogin }) {
   // Form States
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Store login form submit handler
-  const handleStoreSubmit = async (e) => {
+  const handleLoginSubmit = async (e) => {
     e.preventDefault();
     playClick();
     setError('');
     setLoading(true);
 
+    const cleanUsername = username.trim().toLowerCase();
+    const cleanPassword = password.trim();
+
     try {
+      // 1. Check Admin Credentials
+      const adminDocRef = doc(db, 'settings', 'admin');
+      const adminDoc = await getDoc(adminDocRef);
+
+      let expectedUsername = 'admin';
+      let expectedPassword = 'tugba123admin';
+
+      if (adminDoc.exists()) {
+        const adminData = adminDoc.data();
+        expectedUsername = (adminData.username || 'admin').trim().toLowerCase();
+        expectedPassword = (adminData.password || 'tugba123admin').trim();
+      } else {
+        // Auto-seed admin credentials if missing
+        await setDoc(adminDocRef, {
+          username: expectedUsername,
+          password: expectedPassword,
+          created_at: new Date().toISOString(),
+        });
+      }
+
+      if (cleanUsername === expectedUsername && cleanPassword === expectedPassword) {
+        if (onAdminLogin) onAdminLogin();
+        navigate('/admin');
+        return;
+      }
+
+      // 2. Check Store Credentials
       const q = query(
         collection(db, 'stores'),
-        where('username', '==', username.trim().toLowerCase()),
-        where('password', '==', password.trim())
+        where('username', '==', cleanUsername),
+        where('password', '==', cleanPassword)
       );
 
       const querySnapshot = await getDocs(q);
 
       if (querySnapshot.empty) {
-        throw new Error('Geçersiz kullanıcı kodu veya şifre.');
+        throw new Error('Geçersiz kullanıcı adı/kodu veya şifre.');
       }
 
       const storeDoc = querySnapshot.docs[0];
@@ -45,6 +68,7 @@ export default function Login({ navigate, defaultView = 'select', onLogin, onAdm
           id: storeDoc.id,
           username: storeData.username,
           name: storeData.name,
+          min_limit: storeData.min_limit !== undefined ? storeData.min_limit : 1000
         })
       );
 
@@ -57,57 +81,6 @@ export default function Login({ navigate, defaultView = 'select', onLogin, onAdm
     }
   };
 
-  // Admin login form submit handler
-  const handleAdminSubmit = async (e) => {
-    e.preventDefault();
-    playClick();
-    setError('');
-    setLoading(true);
-
-    try {
-      const adminDocRef = doc(db, 'settings', 'admin');
-      const adminDoc = await getDoc(adminDocRef);
-
-      let expectedUsername = 'admin';
-      let expectedPassword = 'tugba123admin';
-
-      if (adminDoc.exists()) {
-        const adminData = adminDoc.data();
-        expectedUsername = adminData.username;
-        expectedPassword = adminData.password;
-      } else {
-        // Auto-seed admin credentials if missing
-        await setDoc(adminDocRef, {
-          username: expectedUsername,
-          password: expectedPassword,
-          created_at: new Date().toISOString(),
-        });
-      }
-
-      if (
-        username.trim() === expectedUsername &&
-        password === expectedPassword
-      ) {
-        if (onAdminLogin) onAdminLogin();
-        navigate('/admin');
-      } else {
-        throw new Error('Geçersiz yönetici adı veya şifre.');
-      }
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleBack = () => {
-    playClick();
-    setView('select');
-    setError('');
-    setUsername('');
-    setPassword('');
-  };
-
   return (
     <div style={styles.container}>
       <header style={styles.header}>
@@ -115,124 +88,49 @@ export default function Login({ navigate, defaultView = 'select', onLogin, onAdm
         <h1 style={styles.title}>Hediye Çarkı</h1>
       </header>
 
-      {/* VIEW 1: GATEWAY SELECTION */}
-      {view === 'select' && (
-        <div style={styles.selectContainer}>
-          <p style={styles.selectSubtitle}>Giriş yapmak istediğiniz paneli seçiniz.</p>
-          <div className="select-gateway-grid">
-            {/* Store Login Button (Left) */}
-            <div className="glass-card gateway-card" onClick={() => { playClick(); setView('store'); }}>
-              <div className="gateway-icon">🏪</div>
-              <h2 style={styles.gatewayTitle}>Mağaza Girişi</h2>
-              <p style={styles.gatewayDesc}>Şubeler için hediye çarkı çevirme ekranı</p>
-            </div>
-            {/* Admin Login Button (Right) */}
-            <div className="glass-card gateway-card" onClick={() => { playClick(); setView('admin'); }}>
-              <div className="gateway-icon">⚙️</div>
-              <h2 style={styles.gatewayTitle}>Yönetici Girişi</h2>
-              <p style={styles.gatewayDesc}>Raporlar, olasılıklar ve ürün tanımlamaları</p>
-            </div>
+      <div className="glass-card" style={styles.card}>
+        <h2 style={styles.cardTitle}>Sisteme Giriş</h2>
+        <p style={styles.cardSubtitle}>
+          Şube kodu veya yönetici kullanıcı adınızı kullanarak giriş yapın.
+        </p>
+
+        {error && <div style={styles.error}>{error}</div>}
+
+        <form onSubmit={handleLoginSubmit} style={styles.form}>
+          <div style={styles.formGroup}>
+            <label style={styles.label}>Kullanıcı Adı / Şube Kodu</label>
+            <input
+              type="text"
+              placeholder="Örn: magaza_aydin veya admin"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="glass-input"
+              required
+            />
           </div>
-        </div>
-      )}
 
-      {/* VIEW 2: STORE LOGIN FORM */}
-      {view === 'store' && (
-        <div className="glass-card" style={styles.card}>
-          <h2 style={styles.cardTitle}>Mağaza Girişi</h2>
-          <p style={styles.cardSubtitle}>Şubenizin kullanıcı kodu ve şifresini giriniz.</p>
+          <div style={styles.formGroup}>
+            <label style={styles.label}>Giriş Şifresi</label>
+            <input
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="glass-input"
+              required
+            />
+          </div>
 
-          {error && <div style={styles.error}>{error}</div>}
-
-          <form onSubmit={handleStoreSubmit} style={styles.form}>
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Kullanıcı Kodu</label>
-              <input
-                type="text"
-                placeholder="Örn: magaza_aydin"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="glass-input"
-                required
-              />
-            </div>
-
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Şifre</label>
-              <input
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="glass-input"
-                required
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="btn-primary"
-              style={styles.submitBtn}
-              disabled={loading}
-            >
-              {loading ? 'Giriş Yapılıyor...' : 'GİRİŞ YAP'}
-            </button>
-          </form>
-
-          <button onClick={handleBack} style={styles.backBtn}>
-            ← Giriş Seçimine Geri Dön
+          <button
+            type="submit"
+            className="btn-primary"
+            style={styles.submitBtn}
+            disabled={loading}
+          >
+            {loading ? 'Giriş Yapılıyor...' : 'GİRİŞ YAP'}
           </button>
-        </div>
-      )}
-
-      {/* VIEW 3: ADMIN LOGIN FORM */}
-      {view === 'admin' && (
-        <div className="glass-card" style={{ ...styles.card, border: '2px solid var(--altin)' }}>
-          <h2 style={styles.cardTitle}>Yönetici Girişi</h2>
-          <p style={styles.cardSubtitle}>Sistem ayarları ve raporlar için bilgilerinizi giriniz.</p>
-
-          {error && <div style={styles.error}>{error}</div>}
-
-          <form onSubmit={handleAdminSubmit} style={styles.form}>
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Yönetici Kullanıcı Adı</label>
-              <input
-                type="text"
-                placeholder="Örn: admin"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="glass-input"
-                required
-              />
-            </div>
-
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Yönetici Şifresi</label>
-              <input
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="glass-input"
-                required
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="btn-primary"
-              style={styles.submitBtn}
-              disabled={loading}
-            >
-              {loading ? 'Giriş Yapılıyor...' : 'YÖNETİCİ GİRİŞİ YAP'}
-            </button>
-          </form>
-
-          <button onClick={handleBack} style={styles.backBtn}>
-            ← Giriş Seçimine Geri Dön
-          </button>
-        </div>
-      )}
+        </form>
+      </div>
     </div>
   );
 }

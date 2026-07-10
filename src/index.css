@@ -27,9 +27,16 @@ body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   background: radial-gradient(circle at 50% 30%, #2A6B40 0%, var(--yesil) 45%, var(--koyu-yesil) 100%);
   min-height: 100vh;
+  min-height: -webkit-fill-available;
   color: var(--krem);
   overflow-x: hidden;
   line-height: 1.5;
+}
+
+html {
+  height: -webkit-fill-available;
+  /* Prevent Android soft keyboard from scrolling the page */
+  overscroll-behavior: none;
 }
 
 /* Scrollbar Styles */
@@ -175,8 +182,8 @@ h1, h2, h3, h4, h5, h6 {
   flex-direction: column;
   align-items: flex-start;
   justify-content: center;
-  gap: 24px;
-  padding: 20px;
+  gap: 12px;
+  padding: 15px 20px;
 }
 
 .wheel-container-large {
@@ -188,7 +195,7 @@ h1, h2, h3, h4, h5, h6 {
 @media (max-width: 850px) {
   .wheel-split-layout {
     flex-direction: column;
-    gap: 30px;
+    gap: 20px;
     padding: 10px;
   }
   
@@ -196,7 +203,7 @@ h1, h2, h3, h4, h5, h6 {
     align-items: center;
     text-align: center;
     padding: 10px;
-    gap: 16px;
+    gap: 12px;
   }
 
   .wheel-container-large {
@@ -209,24 +216,31 @@ h1, h2, h3, h4, h5, h6 {
 .wheel-branding {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
   width: 100%;
 }
 
 .wheel-marka {
-  font-size: 14px;
-  letter-spacing: 4px;
+  font-size: 13px;
+  letter-spacing: 3px;
   text-transform: uppercase;
   color: var(--altin);
   font-weight: 700;
 }
 
+.wheel-logo {
+  max-width: 170px;
+  height: auto;
+  margin: 2px 0 6px 0;
+  align-self: flex-start;
+}
+
 .wheel-title {
-  font-size: clamp(32px, 5vw, 52px);
+  font-size: clamp(26px, 4.5vw, 42px);
   font-weight: 900;
   line-height: 1.1;
   text-shadow: 0 3px 0 rgba(0, 0, 0, 0.25);
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
 .wheel-kosul {
@@ -234,8 +248,8 @@ h1, h2, h3, h4, h5, h6 {
   background: var(--altin);
   color: var(--koyu-yesil);
   font-weight: 800;
-  font-size: 14px;
-  padding: 8px 20px;
+  font-size: 12.5px;
+  padding: 6px 16px;
   border-radius: 999px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   align-self: flex-start;
@@ -283,6 +297,9 @@ h1, h2, h3, h4, h5, h6 {
 @media (max-width: 850px) {
   .wheel-branding {
     align-items: center;
+  }
+  .wheel-logo {
+    align-self: center;
   }
   .wheel-title {
     text-align: center;
@@ -399,5 +416,298 @@ h1, h2, h3, h4, h5, h6 {
 .ken-burns-active {
   animation: kenBurnsEffect 10s ease-out infinite alternate;
 }
+
+/* Screensaver version: slower and more subtle zoom */
+@keyframes ssKenBurns {
+  0%   { transform: scale(1)    translate(0, 0);       }
+  100% { transform: scale(1.06) translate(-1%, -0.5%); }
+}
+
+.ss-ken-burns {
+  animation: ssKenBurns 12s ease-out forwards;
+}
+
+
+/* ── Screensaver Slide Animations ─────────────────────────────── */
+
+/* Entering slide: starts blurry/invisible → becomes sharp/visible */
+@keyframes ssEnter {
+  0%   { opacity: 0; filter: blur(24px); transform: scale(1.06); }
+  100% { opacity: 1; filter: blur(0px);  transform: scale(1);    }
+}
+
+/* Exiting slide: was sharp/visible → fades out with subtle blur */
+@keyframes ssExit {
+  0%   { opacity: 1; filter: blur(0px);  transform: scale(1);    }
+  100% { opacity: 0; filter: blur(16px); transform: scale(0.97); }
+}
+
+.ss-enter {
+  animation: ssEnter 2s ease-in-out forwards;
+  z-index: 10;
+}
+
+.ss-exit {
+  animation: ssExit 2s ease-in-out forwards;
+  z-index: 5;
+}
+
+/* Callout pulse animations */
+@keyframes ripple {
+  0%, 100% { transform: scale(1);    opacity: 1;   }
+  50%       { transform: scale(1.35); opacity: 0.6; }
+}
+
+@keyframes pulseText {
+  0%, 100% { opacity: 1;    }
+  50%       { opacity: 0.55; }
+}
+
+/* ── Admin Panel Mobile Fixes ─────────────────────────────────── */
+
+/* Navbar: telefonda üst bar sıkışmasın */
+@media (max-width: 700px) {
+  /* Navbar başlık metnini küçült */
+  .admin-navbar-title {
+    font-size: 13px !important;
+  }
+
+  /* Tab butonları font küçülsün */
+  .admin-tab-btn {
+    font-size: 12px !important;
+    padding: 10px 6px !important;
+  }
+
+  /* CRUD grid tek sütuna düşsün */
+  .admin-crud-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Summary kartlardaki uzun metin taşmasın */
+  .admin-summary-text {
+    font-size: 16px !important;
+    height: auto !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+    line-height: 1.3 !important;
+  }
+
+  /* Summary kart numarası da küçülsün */
+  .admin-summary-number {
+    font-size: 36px !important;
+  }
+
+  /* Tablo header + buton satırı dikeye dönsün */
+  .admin-table-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 10px !important;
+  }
+
+  /* CSV & Sıfırla butonları yan yana, tam genişlik */
+  .admin-table-header > div {
+    width: 100% !important;
+    display: flex !important;
+    gap: 8px !important;
+  }
+
+  .admin-table-header > div > button {
+    flex: 1 !important;
+    font-size: 12px !important;
+    padding: 8px 6px !important;
+    text-align: center !important;
+  }
+
+  /* Tablonun taşan kolonlarını kes + scroll */
+  .admin-table-wrap {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  /* Tablo td/th font küçülsün, padding azalsın */
+  .admin-table-wrap table {
+    font-size: 12px !important;
+    min-width: 440px !important;
+  }
+
+  .admin-table-wrap th,
+  .admin-table-wrap td {
+    padding: 10px 8px !important;
+    white-space: nowrap !important;
+  }
+
+  /* Kazanılan Hediye badge kelime kes */
+  .admin-win-badge {
+    white-space: normal !important;
+    word-break: break-word !important;
+    max-width: 120px !important;
+    display: inline-block !important;
+    line-height: 1.3 !important;
+    font-size: 11px !important;
+  }
+
+  /* Sub-tab butonları */
+  .admin-subtab-btn {
+    font-size: 12px !important;
+    padding-bottom: 8px !important;
+  }
+
+  /* Filter grid tek sütun */
+  .admin-filter-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  .admin-filter-grid > div {
+    min-width: 0 !important;
+  }
+
+  .admin-filter-card {
+    padding: 16px !important;
+    margin-bottom: 16px !important;
+  }
+
+
+  /* Navbar butonları küçülsün */
+  .admin-nav-live-btn,
+  .admin-nav-logout-btn {
+    font-size: 12px !important;
+    padding: 5px 8px !important;
+  }
+}
+
+/* Print utility classes */
+.print-only {
+  display: none !important;
+}
+
+@media print {
+  /* Hide all screen components */
+  .no-print {
+    display: none !important;
+  }
+  
+  /* Show only the print-only container */
+  .print-only {
+    display: block !important;
+    width: 100% !important;
+    max-width: 820px !important;
+    margin: 0 auto !important;
+    padding: 5mm !important;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+    font-size: 14px !important;
+    line-height: 1.5 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  /* Support printing background colors and graphics */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  /* Ensure page margins are standard for A4 portrait */
+  @page {
+    size: A4 portrait;
+    margin: 15mm;
+  }
+  
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}
+
+/* Virtual Keypad Styling */
+.wheel-keypad-container {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  width: 100%;
+  max-width: 280px;
+  margin-top: 10px;
+}
+
+.wheel-keypad-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  color: var(--krem);
+  font-size: 18px;
+  font-weight: 800;
+  font-family: 'Outfit', sans-serif;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.1s ease;
+  user-select: none;
+  outline: none;
+}
+
+.wheel-keypad-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: var(--altin);
+  color: var(--altin);
+}
+
+.wheel-keypad-btn:active {
+  transform: scale(0.95);
+  background: rgba(217, 164, 65, 0.2);
+  border-color: var(--altin);
+}
+
+.wheel-keypad-btn.action-btn {
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 15px;
+}
+
+.wheel-keypad-btn.clear-btn {
+  color: var(--pembe);
+}
+.wheel-keypad-btn.clear-btn:hover {
+  color: #fff;
+  background: rgba(179, 64, 47, 0.3);
+  border-color: var(--kirmizi);
+}
+
+.wheel-keypad-btn.backspace-btn {
+  color: var(--altin);
+}
+.wheel-keypad-btn.backspace-btn:hover {
+  color: var(--koyu-yesil);
+  background: var(--altin);
+  border-color: var(--altin);
+}
+.wheel-keypad-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none !important;
+  background: rgba(255, 255, 255, 0.02) !important;
+  border-color: rgba(255, 255, 255, 0.05) !important;
+  color: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Accordion Keypad Transition Styling */
+.wheel-keypad-accordion {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease, margin-top 0.35s ease;
+  width: 100%;
+  max-width: 280px;
+  margin-top: 0;
+}
+
+.wheel-keypad-accordion.open {
+  max-height: 200px;
+  opacity: 1;
+  margin-top: 10px;
+}
+
 
 

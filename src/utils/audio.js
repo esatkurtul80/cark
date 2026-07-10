@@ -122,3 +122,15 @@ export const playWin = () => {
     console.warn('Audio play failed:', e);
   }
 };
+
+// Play high-quality realistic human applause sound effect
+export const playApplause = () => {
+  try {
+    const audio = new Audio('/audio/applause.mp3');
+    audio.volume = 0.5;
+    audio.play();
+  } catch (e) {
+    console.warn('Applause play failed:', e);
+  }
+};
+
