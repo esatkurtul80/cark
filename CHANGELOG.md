@@ -2,6 +2,13 @@
 
 Tüm sürüm değişiklikleri ve güncellemeler bu dosyada takip edilmektedir.
 
+## [1.1.0] - 2026-07-10
+
+### Eklenen Özellikler
+* **Şube Bazlı Ürün Yönetimi (Veritabanı Uyumlu):** Admin panelindeki **Ürünler** sekmesine şube ve genel şablon seçici dropdown eklendi. İlk açılışta veritabanınızda bulunan mevcut ürünleriniz (şablon olarak) görüntülenir.
+* **Genel Şablondan Ürün Kopyalama (Template Copy):** Ürünü bulunmayan şubeler seçildiğinde, veritabanınızdaki mevcut ürünlerinizi ("HURMİN 430 GR", "HEDİYE ÇEKİ 300 TL" vb.) ilgili şube için otomatik veya manuel olarak kopyalama (cloning) desteği sağlandı.
+* **Şubeye Özel Test Çarkı:** Seçili şubenin çarkını ve kazanma olasılıklarını anlık test edebilmek için şube bazlı "Bu Şubenin Çarkını Test Et" önizleme özelliği eklendi.
+
 ---
 
 ## [1.0.0] - 2026-07-10

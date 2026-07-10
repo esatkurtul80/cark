@@ -67,6 +67,7 @@ export default function Admin({ navigate, onLogout, onPreviewWheel }) {
   const [storeReports, setStoreReports] = useState([]);
   const [filteredStoreReports, setFilteredStoreReports] = useState([]);
   const [productForm, setProductForm] = useState({ id: '', name: '', chance: 20, color: '#2A6B40', text_color: '#FBF3E4', is_active: true });
+  const [selectedProductStoreId, setSelectedProductStoreId] = useState('global');
 
   const [editingReport, setEditingReport] = useState(null);
   const [reportForm, setReportForm] = useState({
@@ -422,24 +423,29 @@ export default function Admin({ navigate, onLogout, onPreviewWheel }) {
 
     try {
       const isEdit = !!productForm.id;
+      const isGlobal = selectedProductStoreId === 'global';
+
+      const fieldsToSave = {
+        name: productForm.name.trim(),
+        chance: productForm.chance,
+        color: productForm.color,
+        text_color: productForm.text_color,
+        is_active: productForm.is_active,
+      };
+
+      if (!isGlobal) {
+        fieldsToSave.store_id = selectedProductStoreId;
+      } else if (isEdit) {
+        fieldsToSave.store_id = deleteField();
+      }
 
       if (isEdit) {
         const docRef = doc(db, 'products', productForm.id);
-        await updateDoc(docRef, {
-          name: productForm.name.trim(),
-          chance: productForm.chance,
-          color: productForm.color,
-          text_color: productForm.text_color,
-          is_active: productForm.is_active
-        });
+        await updateDoc(docRef, fieldsToSave);
         setMessage('Ürün başarıyla güncellendi!');
       } else {
         await addDoc(collection(db, 'products'), {
-          name: productForm.name.trim(),
-          chance: productForm.chance,
-          color: productForm.color,
-          text_color: productForm.text_color,
-          is_active: productForm.is_active,
+          ...fieldsToSave,
           created_at: new Date().toISOString()
         });
         setMessage('Yeni ürün başarıyla eklendi!');
@@ -448,6 +454,7 @@ export default function Admin({ navigate, onLogout, onPreviewWheel }) {
       setProductForm({ id: '', name: '', chance: 20, color: '#2A6B40', text_color: '#FBF3E4', is_active: true });
       fetchProducts();
     } catch (err) {
+      console.error(err);
       setError('Ürün kaydedilirken hata oluştu.');
     } finally {
       setSubmitting(false);
@@ -471,6 +478,42 @@ export default function Admin({ navigate, onLogout, onPreviewWheel }) {
         }
       }
     );
+  };
+
+  const handleCopyFromTemplate = async (storeId) => {
+    playClick();
+    setSubmitting(true);
+    setError('');
+    setMessage('');
+    try {
+      const batch = writeBatch(db);
+      const storeName = stores.find(s => s.id === storeId)?.name || 'Şube';
+      
+      const globalProducts = products.filter(p => !p.store_id || p.store_id === 'global');
+      
+      if (globalProducts.length === 0) {
+        throw new Error('Genel şablonda kopyalanacak ürün bulunamadı. Lütfen önce genel şablona ürün ekleyin.');
+      }
+
+      globalProducts.forEach((item, idx) => {
+        const newDocRef = doc(collection(db, 'products'));
+        const { id, ...cleanItem } = item;
+        batch.set(newDocRef, {
+          ...cleanItem,
+          store_id: storeId,
+          created_at: new Date(Date.now() + idx * 1000).toISOString()
+        });
+      });
+
+      await batch.commit();
+      setMessage(`${storeName} şubesi için genel şablondaki ürünler başarıyla kopyalandı.`);
+      fetchProducts();
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Ürünler kopyalanırken hata oluştu.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // --- RESET HISTORY ---
@@ -1022,177 +1065,245 @@ export default function Admin({ navigate, onLogout, onPreviewWheel }) {
 
         {/* TAB 2: PRODUCTS CRUD */}
         {activeTab === 'urunler' && (
-          <div style={styles.crudContainer} className="admin-crud-grid">
-            <div className="glass-card" style={styles.crudFormCard}>
-              <h3 style={{ color: 'var(--altin)', marginBottom: '20px' }}>
-                {productForm.id ? 'Ürünü Düzenle' : 'Yeni Hediye Ekle'}
-              </h3>
-              <form onSubmit={handleProductSubmit} style={styles.form}>
-                <div style={styles.formGroup}>
-                  <label style={styles.formLabel}>Ürün Hediye Adı</label>
-                  <input
-                    type="text"
-                    placeholder="Örn: Antep Fıstığı"
-                    value={productForm.name}
-                    onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
-                    className="glass-input"
-                    required
-                  />
-                </div>
-
-                <div style={styles.formGroup}>
-                  <label style={styles.formLabel}>Olasılık Değeri (1 / Kaç Çevirme)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="9999"
-                    value={productForm.chance}
-                    onChange={(e) => setProductForm({ ...productForm, chance: parseInt(e.target.value) || 0 })}
-                    className="glass-input"
-                    required
-                  />
-                  <small style={styles.formHelp}>
-                    Örn: <strong>10</strong> → 10 çevirmede 1 kez çıkar. <strong>0</strong> → çarkta görünür fakat hiç çıkmaz.
-                  </small>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div style={styles.formGroup}>
-                    <label style={styles.formLabel}>Dilim Arka Plan</label>
-                    <input
-                      type="color"
-                      value={productForm.color}
-                      onChange={(e) => setProductForm({ ...productForm, color: e.target.value })}
-                      style={styles.colorInput}
-                    />
-                  </div>
-                  <div style={styles.formGroup}>
-                    <label style={styles.formLabel}>Yazı Rengi</label>
-                    <input
-                      type="color"
-                      value={productForm.text_color}
-                      onChange={(e) => setProductForm({ ...productForm, text_color: e.target.value })}
-                      style={styles.colorInput}
-                    />
-                  </div>
-                </div>
-
-                <div style={styles.presetSection}>
-                  <span style={styles.presetLabel}>Renk Şablonları:</span>
-                  <div style={styles.presetGrid}>
-                    {colorPresets.map((p, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        style={{ ...styles.presetBox, backgroundColor: p.bg, border: `2px solid ${p.text}` }}
-                        onClick={() => setProductForm({ ...productForm, color: p.bg, text_color: p.text })}
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                <div style={styles.checkboxGroup}>
-                  <input
-                    type="checkbox"
-                    id="isActive"
-                    checked={productForm.is_active}
-                    onChange={(e) => setProductForm({ ...productForm, is_active: e.target.checked })}
-                    style={styles.checkbox}
-                  />
-                  <label htmlFor="isActive" style={styles.checkboxLabel}>
-                    Çarkta Aktif Olsun (Gösterilsin)
-                  </label>
-                </div>
-
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button
-                    type="submit"
-                    className="btn-primary"
-                    style={{ flex: 1, padding: '12px' }}
-                    disabled={submitting}
-                  >
-                    {submitting ? 'Kaydediliyor...' : 'KAYDET'}
-                  </button>
-                  {productForm.id && (
-                    <button
-                      type="button"
-                      onClick={() => { playClick(); setProductForm({ id: '', name: '', chance: 20, color: '#2A6B40', text_color: '#FBF3E4', is_active: true }); }}
-                      style={styles.cancelBtn}
-                    >
-                      Vazgeç
-                    </button>
-                  )}
-                </div>
-              </form>
+          <div>
+            {/* Şube / Şablon Seçim Kartı */}
+            <div className="glass-card" style={{ padding: '20px 24px', marginBottom: '24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                <label style={{ color: 'var(--altin)', fontWeight: 'bold', fontSize: '15px', margin: 0 }}>İşlem Yapılacak Şube:</label>
+                <select
+                  value={selectedProductStoreId}
+                  onChange={(e) => {
+                    playClick();
+                    setSelectedProductStoreId(e.target.value);
+                    setProductForm({ id: '', name: '', chance: 20, color: '#2A6B40', text_color: '#FBF3E4', is_active: true });
+                  }}
+                  style={{
+                    padding: '10px 16px',
+                    borderRadius: '8px',
+                    border: '1.5px solid var(--altin)',
+                    backgroundColor: 'rgba(18, 58, 32, 0.8)',
+                    color: 'var(--krem)',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    outline: 'none'
+                  }}
+                >
+                  <option value="global" style={{ background: '#123a20', color: 'var(--krem)' }}>Genel Şablon (Tüm Şubeler için)</option>
+                  {stores.map((s) => (
+                    <option key={s.id} value={s.id} style={{ background: '#123a20', color: 'var(--krem)' }}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+              {selectedProductStoreId && selectedProductStoreId !== 'global' && (
+                <button
+                  onClick={() => { playClick(); if (onPreviewWheel) onPreviewWheel(selectedProductStoreId); }}
+                  style={styles.liveLink}
+                  className="admin-nav-live-btn"
+                >
+                  🧪 Bu Şubenin Çarkını Test Et
+                </button>
+              )}
             </div>
 
-            <div className="glass-card" style={styles.crudListCard}>
-              <h3 style={{ color: 'var(--altin)', marginBottom: '20px' }}>
-                Hediye Ürün Listesi ({products.length} adet)
-              </h3>
-              {products.length > 0 ? (() => {
-                const activeProducts = products.filter(p => p.is_active);
-                const totalWeight = activeProducts.reduce((acc, p) => acc + (p.chance > 0 ? 1 / p.chance : 0), 0);
-                return (
-                  <div style={styles.scrollableList}>
-                    {products.map((p) => {
-                      const weight = p.chance > 0 ? 1 / p.chance : 0;
-                      const realPercent = totalWeight > 0 ? ((weight / totalWeight) * 100).toFixed(1) : '0.0';
-                      return (
-                        <div key={p.id} style={styles.listItem}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
-                            <div
-                              style={{
-                                width: '28px',
-                                height: '28px',
-                                borderRadius: '50%',
-                                backgroundColor: p.color,
-                                border: `2px solid ${p.text_color}`,
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: '10px',
-                                color: p.text_color,
-                                fontWeight: 'bold'
-                              }}
-                            >
-                              Aa
-                            </div>
-                            <div>
-                              <strong>{p.name}</strong>
-                              <div style={styles.itemMeta}>
-                                <span>Olasılık: 1/{p.chance} {p.is_active && `(Net Şans: %${realPercent})`}</span>
-                                <span style={{ margin: '0 6px' }}>•</span>
-                                <span style={{ color: p.is_active ? 'var(--yesil-isik)' : '#94A3B8' }}>
-                                  {p.is_active ? 'Aktif' : 'Pasif'}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                          <div style={{ display: 'flex', gap: '6px' }}>
-                            <button
-                              onClick={() => { playClick(); setProductForm(p); }}
-                              style={styles.editBtn}
-                            >
-                              Düzenle
-                            </button>
-                            <button
-                              onClick={() => handleProductDelete(p.id)}
-                              style={styles.delBtn}
-                            >
-                              Sil
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
+            <div style={styles.crudContainer} className="admin-crud-grid">
+              <div className="glass-card" style={styles.crudFormCard}>
+                <h3 style={{ color: 'var(--altin)', marginBottom: '20px' }}>
+                  {productForm.id ? 'Ürünü Düzenle' : (selectedProductStoreId === 'global' ? 'Şablona Hediye Ekle' : 'Şubeye Hediye Ekle')}
+                </h3>
+                <form onSubmit={handleProductSubmit} style={styles.form}>
+                  <div style={styles.formGroup}>
+                    <label style={styles.formLabel}>Ürün Hediye Adı</label>
+                    <input
+                      type="text"
+                      placeholder="Örn: Antep Fıstığı"
+                      value={productForm.name}
+                      onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
+                      className="glass-input"
+                      required
+                    />
                   </div>
-                );
-              })() : (
-                <div style={styles.noDataBox}>
-                  Sistemde hediye tanımlanmamış.
-                </div>
-              )}
+
+                  <div style={styles.formGroup}>
+                    <label style={styles.formLabel}>Olasılık Değeri (1 / Kaç Çevirme)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="9999"
+                      value={productForm.chance}
+                      onChange={(e) => setProductForm({ ...productForm, chance: parseInt(e.target.value) || 0 })}
+                      className="glass-input"
+                      required
+                    />
+                    <small style={styles.formHelp}>
+                      Örn: <strong>10</strong> → 10 çevirmede 1 kez çıkar. <strong>0</strong> → çarkta görünür fakat hiç çıkmaz.
+                    </small>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>Dilim Arka Plan</label>
+                      <input
+                        type="color"
+                        value={productForm.color}
+                        onChange={(e) => setProductForm({ ...productForm, color: e.target.value })}
+                        style={styles.colorInput}
+                      />
+                    </div>
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>Yazı Rengi</label>
+                      <input
+                        type="color"
+                        value={productForm.text_color}
+                        onChange={(e) => setProductForm({ ...productForm, text_color: e.target.value })}
+                        style={styles.colorInput}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={styles.presetSection}>
+                    <span style={styles.presetLabel}>Renk Şablonları:</span>
+                    <div style={styles.presetGrid}>
+                      {colorPresets.map((p, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          style={{ ...styles.presetBox, backgroundColor: p.bg, border: `2px solid ${p.text}` }}
+                          onClick={() => setProductForm({ ...productForm, color: p.bg, text_color: p.text })}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <div style={styles.checkboxGroup}>
+                    <input
+                      type="checkbox"
+                      id="isActive"
+                      checked={productForm.is_active}
+                      onChange={(e) => setProductForm({ ...productForm, is_active: e.target.checked })}
+                      style={styles.checkbox}
+                    />
+                    <label htmlFor="isActive" style={styles.checkboxLabel}>
+                      Çarkta Aktif Olsun (Gösterilsin)
+                    </label>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      type="submit"
+                      className="btn-primary"
+                      style={{ flex: 1, padding: '12px' }}
+                      disabled={submitting}
+                    >
+                      {submitting ? 'Kaydediliyor...' : 'KAYDET'}
+                    </button>
+                    {productForm.id && (
+                      <button
+                        type="button"
+                        onClick={() => { playClick(); setProductForm({ id: '', name: '', chance: 20, color: '#2A6B40', text_color: '#FBF3E4', is_active: true }); }}
+                        style={styles.cancelBtn}
+                      >
+                        Vazgeç
+                      </button>
+                    )}
+                  </div>
+                </form>
+              </div>
+
+              <div className="glass-card" style={styles.crudListCard}>
+                {(() => {
+                  const isGlobal = selectedProductStoreId === 'global';
+                  const storeProducts = products.filter(p => isGlobal ? (!p.store_id || p.store_id === 'global') : (p.store_id === selectedProductStoreId));
+                  const activeProducts = storeProducts.filter(p => p.is_active);
+                  const totalWeight = activeProducts.reduce((acc, p) => acc + (p.chance > 0 ? 1 / p.chance : 0), 0);
+
+                  return (
+                    <>
+                      <h3 style={{ color: 'var(--altin)', marginBottom: '20px' }}>
+                        {isGlobal ? `Genel Şablon Hediye Listesi (${storeProducts.length} adet)` : `Şube Ürün Listesi (${storeProducts.length} adet)`}
+                      </h3>
+                      {storeProducts.length > 0 ? (
+                        <div style={styles.scrollableList}>
+                          {storeProducts.map((p) => {
+                            const weight = p.chance > 0 ? 1 / p.chance : 0;
+                            const realPercent = totalWeight > 0 ? ((weight / totalWeight) * 100).toFixed(1) : '0.0';
+                            return (
+                              <div key={p.id} style={styles.listItem}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
+                                  <div
+                                    style={{
+                                      width: '28px',
+                                      height: '28px',
+                                      borderRadius: '50%',
+                                      backgroundColor: p.color,
+                                      border: `2px solid ${p.text_color}`,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontSize: '10px',
+                                      color: p.text_color,
+                                      fontWeight: 'bold'
+                                    }}
+                                  >
+                                    Aa
+                                  </div>
+                                  <div>
+                                    <strong>{p.name}</strong>
+                                    <div style={styles.itemMeta}>
+                                      <span>Olasılık: 1/{p.chance} {p.is_active && `(Net Şans: %${realPercent})`}</span>
+                                      <span style={{ margin: '0 6px' }}>•</span>
+                                      <span style={{ color: p.is_active ? 'var(--yesil-isik)' : '#94A3B8' }}>
+                                        {p.is_active ? 'Aktif' : 'Pasif'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div style={{ display: 'flex', gap: '6px' }}>
+                                  <button
+                                    onClick={() => { playClick(); setProductForm(p); }}
+                                    style={styles.editBtn}
+                                  >
+                                    Düzenle
+                                  </button>
+                                  <button
+                                    onClick={() => handleProductDelete(p.id)}
+                                    style={styles.delBtn}
+                                  >
+                                    Sil
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div style={{ textAlign: 'center', padding: '40px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+                          <span style={{ fontSize: '48px' }}>🎡</span>
+                          {isGlobal ? (
+                            <p style={{ color: 'var(--krem)', opacity: 0.9, fontSize: '15px', margin: 0 }}>
+                              Sistemde hediye tanımlanmamış. Sol taraftaki formdan yeni ürün ekleyebilirsiniz.
+                            </p>
+                          ) : (
+                            <>
+                              <p style={{ color: 'var(--krem)', opacity: 0.9, fontSize: '15px', margin: 0, lineHeight: '1.5' }}>
+                                Bu şube için henüz özel çark ürünü tanımlanmamış. Genel şablondaki ürünleri bu şubeye kopyalayabilirsiniz.
+                              </p>
+                              <button
+                                onClick={() => handleCopyFromTemplate(selectedProductStoreId)}
+                                className="btn-primary"
+                                style={{ padding: '12px 24px', fontWeight: 'bold' }}
+                                disabled={submitting}
+                              >
+                                {submitting ? 'Kopyalanıyor...' : 'Genel Şablondaki Ürünleri Kopyala'}
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
             </div>
           </div>
         )}

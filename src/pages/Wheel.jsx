@@ -20,7 +20,7 @@ const getRotationDegrees = (element) => {
   return angle;
 };
 
-export default function Wheel({ navigate, onLogout, isAdminPreview, onBackToAdmin }) {
+export default function Wheel({ navigate, onLogout, isAdminPreview, previewStoreId, onBackToAdmin }) {
   const [store, setStore] = useState(null);
   const [products, setProducts] = useState([]);
   const [receiptNo, setReceiptNo] = useState('');
@@ -102,8 +102,23 @@ export default function Wheel({ navigate, onLogout, isAdminPreview, onBackToAdmi
   ];
 
   useEffect(() => {
+    let targetStoreId = null;
+
     if (isAdminPreview) {
-      setStore({ id: 'admin_preview', name: 'Yönetici (Önizleme)', min_limit: 1000 });
+      targetStoreId = previewStoreId || 'admin_preview';
+      setStore({ id: targetStoreId, name: 'Yönetici (Önizleme)', min_limit: 1000 });
+      if (targetStoreId !== 'admin_preview') {
+        getDoc(doc(db, 'stores', targetStoreId)).then(docSnap => {
+          if (docSnap.exists()) {
+            const freshData = docSnap.data();
+            setStore({
+              id: targetStoreId,
+              name: `${freshData.name} (Önizleme)`,
+              min_limit: freshData.min_limit !== undefined ? freshData.min_limit : 1000
+            });
+          }
+        }).catch(err => console.error("Error fetching preview store data:", err));
+      }
     } else {
       const sessionStr = localStorage.getItem('store_session');
       if (!sessionStr) {
@@ -113,6 +128,7 @@ export default function Wheel({ navigate, onLogout, isAdminPreview, onBackToAdmi
       try {
         const parsed = JSON.parse(sessionStr);
         setStore(parsed);
+        targetStoreId = parsed.id;
         // Fetch fresh store data (including name and min_limit)
         getDoc(doc(db, 'stores', parsed.id)).then(docSnap => {
           if (docSnap.exists()) {
@@ -133,29 +149,41 @@ export default function Wheel({ navigate, onLogout, isAdminPreview, onBackToAdmi
       }
     }
 
-    const productsRef = collection(db, 'products');
-    const q = query(productsRef, orderBy('created_at', 'asc'));
+    if (!targetStoreId) return;
 
-    const unsubscribe = onSnapshot(q, async (querySnapshot) => {
+    const productsRef = collection(db, 'products');
+
+    const unsubscribe = onSnapshot(productsRef, async (querySnapshot) => {
       let list = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-      if (list.length === 0) {
-        console.log('Seeding initial products into Firestore...');
+      // Client-side sort by created_at to avoid composite index requirements
+      list.sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''));
+
+      const storeProducts = list.filter(p => p.store_id === targetStoreId);
+      const globalProducts = list.filter(p => !p.store_id || p.store_id === 'global');
+
+      if (storeProducts.length === 0) {
+        console.log('No store products found. Copying from database global template...');
         try {
           const batch = writeBatch(db);
-          defaultProducts.forEach((item, idx) => {
+          // If the database has global template products, we copy them. Otherwise fallback to code defaults.
+          const sourceProducts = globalProducts.length > 0 ? globalProducts : defaultProducts;
+
+          sourceProducts.forEach((item, idx) => {
             const newDocRef = doc(collection(db, 'products'));
+            const { id, ...cleanItem } = item;
             batch.set(newDocRef, {
-              ...item,
+              ...cleanItem,
+              store_id: targetStoreId,
               created_at: new Date(Date.now() + idx * 1000).toISOString()
             });
           });
           await batch.commit();
         } catch (err) {
-          console.error('Error seeding products:', err);
+          console.error('Error copying template products:', err);
         }
       } else {
-        setProducts(list.filter(p => p.is_active));
+        setProducts(list.filter(p => p.store_id === targetStoreId && p.is_active));
         setLoading(false);
       }
     }, (err) => {
@@ -170,7 +198,7 @@ export default function Wheel({ navigate, onLogout, isAdminPreview, onBackToAdmi
         cancelAnimationFrame(animationFrameIdRef.current);
       }
     };
-  }, [navigate, isAdminPreview]);
+  }, [navigate, isAdminPreview, previewStoreId]);
 
   // Fetch spins for the current logged-in store
   useEffect(() => {

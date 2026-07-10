@@ -239,6 +239,7 @@ export default function App() {
             navigate={navigate}
             onLogout={handleAdminLogout}
             isAdminPreview={true}
+            previewStoreId={typeof adminPreviewWheel === 'string' ? adminPreviewWheel : 'admin_preview'}
             onBackToAdmin={() => setAdminPreviewWheel(false)}
           />
         );
@@ -247,7 +248,7 @@ export default function App() {
         <Admin
           navigate={navigate}
           onLogout={handleAdminLogout}
-          onPreviewWheel={() => setAdminPreviewWheel(true)}
+          onPreviewWheel={(storeId) => setAdminPreviewWheel(storeId || true)}
         />
       );
     }
