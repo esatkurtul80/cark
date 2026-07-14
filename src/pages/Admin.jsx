@@ -584,6 +584,61 @@ export default function Admin({ navigate, onLogout, onPreviewWheel }) {
     document.body.removeChild(link);
   };
 
+  // --- EXPORT STORE DAILY REPORTS TO EXCEL/CSV ---
+  const exportStoreReportsToCSV = () => {
+    playClick();
+    if (filteredStoreReports.length === 0) return;
+
+    const headers = [
+      'Şube Adı',
+      'Tarih',
+      'Mağaza Cirosu (TL)',
+      'Tezgah Tamamlama (adet)',
+      'Kasa Tamamlama (adet)',
+      'Çark İkramlık (TL)',
+      'Ortalama Sepet (TL)',
+      'Müşteri Sayısı',
+      'Çark Çevrim Adeti'
+    ];
+
+    const rows = filteredStoreReports.map(report => {
+      const defaultSpinCount = spins.filter(
+        s => s.store_id === report.store_id &&
+        s.created_at?.split('T')[0] === report.created_at?.split('T')[0]
+      ).length;
+      const displaySpinCount = report.spin_count !== undefined ? report.spin_count : defaultSpinCount;
+      const dateStr = new Date(report.created_at).toLocaleDateString('tr-TR');
+
+      return [
+        report.store_name,
+        dateStr,
+        String(report.turnover ?? 0),
+        String(report.counter_completion ?? 0),
+        String(report.cashier_completion ?? 0),
+        String(report.wheel_treat_amount ?? 0),
+        String(report.average_basket ?? 0),
+        String(report.customer_count ?? 0),
+        String(displaySpinCount)
+      ];
+    });
+
+    let csvContent = "\uFEFF"; // UTF-8 BOM
+    csvContent += headers.join(';') + '\n';
+    rows.forEach(row => {
+      const escapedRow = row.map(val => `"${String(val).replace(/"/g, '""')}"`);
+      csvContent += escapedRow.join(';') + '\n';
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `tugba_sube_gunluk_veriler_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const colorPresets = [
     { bg: '#2A6B40', text: '#FBF3E4' },
     { bg: '#D9A441', text: '#123A20' },
@@ -943,6 +998,13 @@ export default function Admin({ navigate, onLogout, onPreviewWheel }) {
                 <>
                   <div style={styles.tableHeaderSection} className="admin-table-header">
                     <h3 style={{ color: 'var(--altin)' }}>Şube Günlük Veri Girişleri</h3>
+                    <button
+                      onClick={exportStoreReportsToCSV}
+                      style={styles.csvBtn}
+                      disabled={filteredStoreReports.length === 0}
+                    >
+                      📊 CSV / Excel Olarak İndir
+                    </button>
                   </div>
 
                   {filteredStoreReports.length > 0 ? (
